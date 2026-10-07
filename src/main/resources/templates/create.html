@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en"
+      xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Create Notification</title>
+
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+
+<body>
+
+<header class="navbar">
+    <div class="container navbar-content">
+
+        <a class="logo"
+           th:href="@{/notifications}">
+            Notification System
+        </a>
+
+        <nav>
+            <a th:href="@{/notifications}">
+                Notifications
+            </a>
+        </nav>
+
+    </div>
+</header>
+
+
+<main class="container">
+
+    <div class="page-header">
+        <div>
+            <h1>Create Notification</h1>
+
+            <p class="subtitle">
+                Create and send a new notification.
+            </p>
+        </div>
+    </div>
+
+
+    <div class="card">
+
+        <form th:action="@{/notifications}"
+              th:object="${notification}"
+              method="post">
+
+
+            <!-- Subject -->
+
+            <div class="form-group">
+
+                <label for="subject">
+                    Subject
+                </label>
+
+                <input
+                        type="text"
+                        id="subject"
+                        th:field="*{subject}"
+                        placeholder="Notification subject"
+                        required>
+
+                <p class="form-error"
+                   th:if="${#fields.hasErrors('subject')}"
+                   th:errors="*{subject}">
+                </p>
+
+            </div>
+
+
+            <!-- Recipient -->
+
+            <div class="form-group">
+
+                <label for="recipientIds">
+                    Recipient
+                </label>
+
+                <select
+                        id="recipientIds"
+                        th:field="*{recipientIds}"
+                        multiple
+                        required>
+
+                    <option
+                            th:each="recipient : ${recipients}"
+                            th:value="${recipient.id}"
+                            th:text="${recipient.address}">
+
+                        recipient@example.com
+
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <!-- Message -->
+
+            <div class="form-group">
+
+                <label for="message">
+                    Message
+                </label>
+
+                <textarea
+                        id="message"
+                        th:field="*{message}"
+                        rows="8"
+                        placeholder="Write your notification..."
+                        required>
+                    </textarea>
+
+                <p class="form-error"
+                   th:if="${#fields.hasErrors('message')}"
+                   th:errors="*{message}">
+                </p>
+
+            </div>
+
+
+            <!-- Buttons -->
+
+            <div class="form-actions">
+
+                <a class="button"
+                   th:href="@{/notifications}">
+                    Cancel
+                </a>
+
+                <button
+                        type="submit"
+                        class="button button-primary">
+                    Send Notification
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</main>
+
+</body>
+</html>

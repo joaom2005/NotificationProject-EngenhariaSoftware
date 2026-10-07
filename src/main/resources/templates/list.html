@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en"
+      xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Notifications</title>
+
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+
+<body>
+
+<header class="navbar">
+    <div class="container navbar-content">
+        <a class="logo" th:href="@{/notifications}">
+            Notification System
+        </a>
+
+        <nav>
+            <a th:href="@{/notifications}">Notifications</a>
+            <a class="button button-primary"
+               th:href="@{/notifications/create}">
+                New Notification
+            </a>
+        </nav>
+    </div>
+</header>
+
+
+<main class="container">
+
+    <div class="page-header">
+        <div>
+            <h1>Notifications</h1>
+            <p class="subtitle">
+                View and manage your notifications.
+            </p>
+        </div>
+
+        <a class="button button-primary"
+           th:href="@{/notifications/create}">
+            + New Notification
+        </a>
+    </div>
+
+
+    <!-- Success message -->
+    <div class="alert alert-success"
+         th:if="${successMessage}"
+         th:text="${successMessage}">
+        Notification created successfully.
+    </div>
+
+
+    <!-- Empty state -->
+    <div class="empty-state"
+         th:if="${#lists.isEmpty(notifications)}">
+
+        <h2>No notifications</h2>
+
+        <p>
+            There are currently no notifications.
+        </p>
+
+        <a class="button button-primary"
+           th:href="@{/notifications/create}">
+            Create Notification
+        </a>
+    </div>
+
+
+    <!-- Notifications table -->
+    <div class="table-container"
+         th:if="${!#lists.isEmpty(notifications)}">
+
+        <table>
+
+            <thead>
+            <tr>
+                <th>ID</th>
+                <th>Subject</th>
+                <th>Recipients</th>
+                <th>Date</th>
+                <th></th>
+            </tr>
+            </thead>
+
+            <tbody>
+
+            <tr th:each="notification : ${notifications}">
+
+                <td th:text="${notification.id}">
+                    1
+                </td>
+
+                <td>
+                    <strong th:text="${notification.subject}">
+                        Example notification
+                    </strong>
+                </td>
+
+                <td>
+                    <div th:each="recipient : ${notification.recipients}"
+                         th:text="${recipient.address}">
+                        recipient@example.com
+                    </div>
+                </td>
+
+                <td th:text="${notification.createdAt}">
+                    2026-10-07 14:30
+                </td>
+
+                <td class="actions">
+                    <a class="button button-small"
+                       th:href="@{/notifications/{id}(id=${notification.id})}">
+                        View
+                    </a>
+                </td>
+
+            </tr>
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</main>
+
+</body>
+</html>
