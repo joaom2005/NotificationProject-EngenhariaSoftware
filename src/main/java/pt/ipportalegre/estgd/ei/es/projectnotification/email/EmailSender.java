@@ -24,24 +24,19 @@ public class EmailSender {
     }
 
     public void send(Notification notification) {
-        List<Recipient> recipients = notification.getRecipients();
+        List<String> recipients = notification.getRecipients();
         if (recipients == null || recipients.isEmpty()) {
             throw new IllegalArgumentException("A notification must have at least one recipient");
         }
 
-        for (Recipient recipient : recipients) {
-            if (!StringUtils.hasText(recipient.getAddress())) {
-                throw new IllegalArgumentException("Recipient email address must not be blank");
-            }
-
-            SimpleMailMessage message = new SimpleMailMessage();
-            if (StringUtils.hasText(fromAddress)) {
-                message.setFrom(fromAddress);
-            }
-            message.setTo(recipient.getAddress());
-            message.setSubject(notification.getSubject());
-            message.setText(notification.getMessage());
-            mailSender.send(message);
+        // A single message for the whole notification
+        SimpleMailMessage message = new SimpleMailMessage();
+        if (StringUtils.hasText(fromAddress)) {
+            message.setFrom(fromAddress);
         }
+        message.setTo(recipients.toArray(String[]::new));
+        message.setSubject(notification.getSubject());
+        message.setText(notification.getMessage());
+        mailSender.send(message);
     }
 }

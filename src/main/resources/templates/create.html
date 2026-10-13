@@ -25,6 +25,9 @@
             <a th:href="@{/notifications}">
                 Notifications
             </a>
+            <a th:href="@{/recipients}">
+                Recipients
+            </a>
         </nav>
 
     </div>
@@ -50,19 +53,16 @@
               th:object="${notification}"
               method="post">
 
-
             <!-- Subject -->
 
             <div class="form-group">
-
-                <label for="subject">
-                    Subject
-                </label>
+                <label for="subject">Subject</label>
 
                 <input
                         type="text"
                         id="subject"
                         th:field="*{subject}"
+                        maxlength="255"
                         placeholder="Notification subject"
                         required>
 
@@ -70,35 +70,24 @@
                    th:if="${#fields.hasErrors('subject')}"
                    th:errors="*{subject}">
                 </p>
-
             </div>
 
-
-            <!-- Recipient -->
+            <!-- Recipients -->
 
             <div class="form-group">
+                <label for="recipients">Recipients</label>
 
-                <label for="recipientIds">
-                    Recipient
-                </label>
-
-                <select
-                        id="recipientIds"
-                        th:field="*{recipientIds}"
-                        multiple
+                <input
+                        type="text"
+                        id="recipients"
+                        th:field="*{recipients}"
+                        placeholder="a@example.com, b@example.com"
                         required>
 
-                    <option
-                            th:each="recipient : ${recipients}"
-                            th:value="${recipient.id}"
-                            th:text="${recipient.address}">
-
-                        recipient@example.com
-
-                    </option>
-
-                </select>
-
+                <p class="form-error"
+                   th:if="${#fields.hasErrors('recipients*')}"
+                   th:errors="*{recipients*}">
+                </p>
             </div>
 
 
@@ -116,7 +105,7 @@
                         rows="8"
                         placeholder="Write your notification..."
                         required>
-                    </textarea>
+                </textarea>
 
                 <p class="form-error"
                    th:if="${#fields.hasErrors('message')}"

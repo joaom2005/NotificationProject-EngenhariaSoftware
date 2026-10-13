@@ -2,8 +2,6 @@ package pt.ipportalegre.estgd.ei.es.projectnotification.entity;
 
 import jakarta.persistence.*;
 
-import jakarta.persistence.*;
-
 @Entity
 @Table(name = "recipients")
 public class Recipient {

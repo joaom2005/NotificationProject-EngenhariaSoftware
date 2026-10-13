@@ -26,10 +26,8 @@
             <a th:href="@{/notifications}">
                 Notifications
             </a>
-
-            <a class="button button-primary"
-               th:href="@{/notifications/create}">
-                New Notification
+            <a th:href="@{/recipients}">
+                Recipients
             </a>
         </nav>
 
@@ -66,37 +64,24 @@
 
 
         <div class="detail-row">
-
-            <span class="detail-label">
-                Recipients
-            </span>
-
+            <span class="detail-label">Recipients</span>
             <div>
                 <div th:each="recipient : ${notification.recipients}"
-                     th:text="${recipient.address}">
+                     th:text="${recipient}">
                     example@example.com
                 </div>
             </div>
-
-
-            <hr>
-
-
-            <!-- Message -->
-
-            <div class="message">
-
-                <h2>Message</h2>
-
-                <p th:text="${notification.message}">
-                    This is the notification message.
-                </p>
-
-            </div>
-
-
         </div>
 
+        <hr>
+
+        <div class="message">
+            <h2>Message</h2>
+            <p th:text="${notification.message}">
+                This is the notification message.
+            </p>
+        </div>
+    </div>
 </main>
 
 </body>

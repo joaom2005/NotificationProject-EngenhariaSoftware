@@ -9,7 +9,6 @@ import pt.ipportalegre.estgd.ei.es.projectnotification.email.EmailSender;
 import pt.ipportalegre.estgd.ei.es.projectnotification.entity.Notification;
 import pt.ipportalegre.estgd.ei.es.projectnotification.entity.Recipient;
 import pt.ipportalegre.estgd.ei.es.projectnotification.repository.NotificationRepository;
-import pt.ipportalegre.estgd.ei.es.projectnotification.repository.RecipientRepository;
 
 import java.util.List;
 
@@ -17,15 +16,12 @@ import java.util.List;
 public class NotificationServiceImpl implements INotificationUseCases {
 
     private final NotificationRepository notificationRepository;
-    private final RecipientRepository recipientRepository;
     private final EmailSender emailSender;
 
     public NotificationServiceImpl(
             NotificationRepository notificationRepository,
-            RecipientRepository recipientRepository,
             EmailSender emailSender) {
         this.notificationRepository = notificationRepository;
-        this.recipientRepository = recipientRepository;
         this.emailSender = emailSender;
     }
 
@@ -41,26 +37,11 @@ public class NotificationServiceImpl implements INotificationUseCases {
     }
 
     @Override
-    public List<Recipient> getRecipients() {
-        return recipientRepository.findAll();
-    }
-
-    @Override
     public void createNotification(NotificationRequest request) {
-        if (request.getRecipientIds() == null || request.getRecipientIds().isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Select at least one recipient");
-        }
-
-        List<Recipient> recipients = recipientRepository.findAllById(request.getRecipientIds());
-        if (recipients.size() != request.getRecipientIds().size()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "One or more recipients do not exist");
-        }
-
-        Notification notification = new Notification(
-                recipients,
+        Notification notification = notificationRepository.save(new Notification(
+                request.getRecipients(),
                 request.getSubject(),
-                request.getMessage());
-        Notification savedNotification = notificationRepository.save(notification);
-        emailSender.send(savedNotification);
+                request.getMessage()));
+        emailSender.send(notification);
     }
 }

@@ -1,12 +1,14 @@
 package pt.ipportalegre.estgd.ei.es.projectnotification.controller;
 
+import jakarta.validation.Valid;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pt.ipportalegre.estgd.ei.es.projectnotification.dto.NotificationRequest;
 import pt.ipportalegre.estgd.ei.es.projectnotification.entity.Notification;
-import pt.ipportalegre.estgd.ei.es.projectnotification.entity.Recipient;
 import pt.ipportalegre.estgd.ei.es.projectnotification.service.INotificationUseCases;
 
 import java.util.List;
@@ -26,7 +28,6 @@ public class NotificationController {
         public String home() {
             return "redirect:/notifications";
         }
-
 
         /**
          * Displays all existing notifications.
@@ -48,17 +49,7 @@ public class NotificationController {
          */
         @GetMapping("/notifications/create")
         public String createForm(Model model) {
-
-            model.addAttribute(
-                    "notification",
-                    new NotificationRequest()
-            );
-
-            List<Recipient> recipients =
-                    notificationService.getRecipients();
-
-            model.addAttribute("recipients", recipients);
-
+            model.addAttribute("notification", new NotificationRequest());
             return "create";
         }
 
@@ -68,11 +59,16 @@ public class NotificationController {
          */
         @PostMapping("/notifications")
         public String create(
-                @ModelAttribute("notification")
-                NotificationRequest notification) {
+                @Valid @ModelAttribute("notification") NotificationRequest notification,
+                BindingResult result,
+                RedirectAttributes redirectAttributes) {
+
+            if (result.hasErrors()) {
+                return "create";
+            }
 
             notificationService.createNotification(notification);
-
+            redirectAttributes.addFlashAttribute("successMessage", "Notification created successfully.");
             return "redirect:/notifications";
         }
 

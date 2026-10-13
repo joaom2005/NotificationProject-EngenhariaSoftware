@@ -14,13 +14,13 @@ public class Notification {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToMany(cascade = {CascadeType.DETACH, CascadeType.MERGE, CascadeType.PERSIST, CascadeType.REFRESH})
-    @JoinTable(
-            name = "notification_recipients",
-            joinColumns = @JoinColumn(name = "notification_id"),
-            inverseJoinColumns = @JoinColumn(name = "recipient_id")
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(
+            name = "notification_recipient_addresses",
+            joinColumns = @JoinColumn(name = "notification_id")
     )
-    private List<Recipient> recipients = new ArrayList<>();
+    @Column(name = "address", nullable = false)
+    private List<String> recipients = new ArrayList<>();
 
     @Column(nullable = false)
     private String subject;
@@ -31,61 +31,51 @@ public class Notification {
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
+    @Column(columnDefinition = "TEXT")
+    private String errorMessage;
+
     // Constructors
 
     public Notification() {
         this.createdAt = LocalDateTime.now();
     }
 
-    public Notification(
-            List<Recipient> recipients,
-            String subject,
-            String message) {
-
-        this.recipients = recipients;
+    public Notification(List<String> recipients, String subject, String message) {
+        this.recipients = new ArrayList<>(recipients);
         this.subject = subject;
         this.message = message;
         this.createdAt = LocalDateTime.now();
     }
 
-
     public Long getId() {
         return id;
     }
 
-
-    public List<Recipient> getRecipients() {
-        return recipients;
-    }
-
-    public void setRecipients(List<Recipient> recipients) {
-        this.recipients = recipients;
-    }
-
+    public List<String> getRecipients() { return recipients; }
+    public void setRecipients(List<String> recipients) { this.recipients = recipients; }
 
     public String getSubject() {
         return subject;
     }
-
     public void setSubject(String subject) {
         this.subject = subject;
     }
 
-
     public String getMessage() {
         return message;
     }
-
     public void setMessage(String message) {
         this.message = message;
     }
 
-
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
-
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getErrorMessage() {
+        return errorMessage;
     }
 }

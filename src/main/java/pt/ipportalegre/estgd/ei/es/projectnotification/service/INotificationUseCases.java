@@ -9,6 +9,5 @@ import java.util.List;
 public interface INotificationUseCases {
     List<Notification> getNotifications();
     Notification getNotification(Long id);
-    List<Recipient> getRecipients();
     void createNotification(NotificationRequest request);
 }

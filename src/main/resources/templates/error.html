@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Error</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+<main class="container">
+    <div class="empty-state">
+        <h2 th:text="${title}">Error</h2>
+        <p th:text="${message}">Something went wrong.</p>
+        <a class="button button-primary" th:href="@{/notifications}">Back to notifications</a>
+    </div>
+</main>
+</body>
+</html>
