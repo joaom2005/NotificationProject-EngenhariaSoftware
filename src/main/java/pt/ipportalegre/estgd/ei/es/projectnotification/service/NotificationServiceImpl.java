@@ -1,28 +1,28 @@
 package pt.ipportalegre.estgd.ei.es.projectnotification.service;
 
 import jakarta.persistence.EntityNotFoundException;
-import org.springframework.http.HttpStatus;
+
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
+
 import pt.ipportalegre.estgd.ei.es.projectnotification.dto.NotificationRequest;
-import pt.ipportalegre.estgd.ei.es.projectnotification.email.EmailSender;
 import pt.ipportalegre.estgd.ei.es.projectnotification.entity.Notification;
-import pt.ipportalegre.estgd.ei.es.projectnotification.entity.Recipient;
 import pt.ipportalegre.estgd.ei.es.projectnotification.repository.NotificationRepository;
+import pt.ipportalegre.estgd.ei.es.projectnotification.sender.NotificationSender;
 
 import java.util.List;
 
 @Service
-public class NotificationServiceImpl implements INotificationUseCases {
+public class NotificationServiceImpl implements NotificationUseCases {
 
     private final NotificationRepository notificationRepository;
-    private final EmailSender emailSender;
+    private final NotificationSender sender;
 
     public NotificationServiceImpl(
             NotificationRepository notificationRepository,
-            EmailSender emailSender) {
+            NotificationSender sender) {
         this.notificationRepository = notificationRepository;
-        this.emailSender = emailSender;
+        this.sender = sender;
     }
 
     @Override
@@ -42,6 +42,6 @@ public class NotificationServiceImpl implements INotificationUseCases {
                 request.getRecipients(),
                 request.getSubject(),
                 request.getMessage()));
-        emailSender.send(notification);
+        sender.send(notification);
     }
 }

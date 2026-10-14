@@ -25,9 +25,6 @@
             <a th:href="@{/notifications}">
                 Notifications
             </a>
-            <a th:href="@{/recipients}">
-                Recipients
-            </a>
         </nav>
 
     </div>
@@ -85,8 +82,8 @@
                         required>
 
                 <p class="form-error"
-                   th:if="${#fields.hasErrors('recipients*')}"
-                   th:errors="*{recipients*}">
+                   th:each="err : ${#fields.errors('recipients*')}"
+                   th:text="${err}">
                 </p>
             </div>
 

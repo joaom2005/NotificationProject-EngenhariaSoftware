@@ -31,9 +31,6 @@ public class Notification {
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
-    @Column(columnDefinition = "TEXT")
-    private String errorMessage;
-
     // Constructors
 
     public Notification() {
@@ -73,9 +70,5 @@ public class Notification {
     }
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
-    }
-
-    public String getErrorMessage() {
-        return errorMessage;
     }
 }

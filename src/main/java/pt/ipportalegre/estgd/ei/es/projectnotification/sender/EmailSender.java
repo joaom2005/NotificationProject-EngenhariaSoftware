@@ -1,4 +1,4 @@
-package pt.ipportalegre.estgd.ei.es.projectnotification.email;
+package pt.ipportalegre.estgd.ei.es.projectnotification.sender;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
@@ -6,12 +6,11 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import pt.ipportalegre.estgd.ei.es.projectnotification.entity.Notification;
-import pt.ipportalegre.estgd.ei.es.projectnotification.entity.Recipient;
 
 import java.util.List;
 
 @Component
-public class EmailSender {
+public class EmailSender implements NotificationSender {
 
     private final JavaMailSender mailSender;
     private final String fromAddress;
@@ -23,6 +22,7 @@ public class EmailSender {
         this.fromAddress = fromAddress;
     }
 
+    @Override
     public void send(Notification notification) {
         List<String> recipients = notification.getRecipients();
         if (recipients == null || recipients.isEmpty()) {

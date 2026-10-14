@@ -1,25 +1,26 @@
 package pt.ipportalegre.estgd.ei.es.projectnotification.controller;
 
 import jakarta.validation.Valid;
+
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
-
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
 import pt.ipportalegre.estgd.ei.es.projectnotification.dto.NotificationRequest;
 import pt.ipportalegre.estgd.ei.es.projectnotification.entity.Notification;
-import pt.ipportalegre.estgd.ei.es.projectnotification.service.INotificationUseCases;
+import pt.ipportalegre.estgd.ei.es.projectnotification.service.NotificationUseCases;
 
 import java.util.List;
 
 @Controller
 public class NotificationController {
 
-        private final INotificationUseCases notificationService;
+        private final NotificationUseCases notificationService;
 
         public NotificationController(
-                INotificationUseCases notificationService) {
+                NotificationUseCases notificationService) {
 
             this.notificationService = notificationService;
         }
@@ -64,6 +65,9 @@ public class NotificationController {
                 RedirectAttributes redirectAttributes) {
 
             if (result.hasErrors()) {
+                result.getFieldErrors().forEach(e ->
+                        System.out.println(e.getField() + " -> " + e.getDefaultMessage()));
+
                 return "create";
             }
 
