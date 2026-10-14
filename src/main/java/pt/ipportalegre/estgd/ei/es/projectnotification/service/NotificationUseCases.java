@@ -7,6 +7,7 @@ import java.util.List;
 
 public interface NotificationUseCases {
     List<Notification> getNotifications();
+    List<Notification> getSortedNotifications();
     Notification getNotification(Long id);
     void createNotification(NotificationRequest request);
 }

@@ -37,7 +37,7 @@ public class NotificationController {
         public String list(Model model) {
 
             List<Notification> notifications =
-                    notificationService.getNotifications();
+                    notificationService.getSortedNotifications();
 
             model.addAttribute("notifications", notifications);
 

@@ -31,6 +31,11 @@ public class NotificationServiceImpl implements NotificationUseCases {
     }
 
     @Override
+    public List<Notification> getSortedNotifications() {
+        return notificationRepository.findAll(Sort.by("createdAt").descending());
+    }
+
+    @Override
     public Notification getNotification(Long id) {
         return notificationRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Notification not found: " + id));
