@@ -18,6 +18,8 @@ import pt.ipportalegre.estgd.ei.es.projectnotification.repository.NotificationRe
 import pt.ipportalegre.estgd.ei.es.projectnotification.sender.FailureSimulatingSender;
 import pt.ipportalegre.estgd.ei.es.projectnotification.sender.NotificationSender;
 import pt.ipportalegre.estgd.ei.es.projectnotification.sender.SimulatedDeliveryException;
+import pt.ipportalegre.estgd.ei.es.projectnotification.sender.PermanentDeliveryException;
+import pt.ipportalegre.estgd.ei.es.projectnotification.sender.RetryableDeliveryException;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -30,11 +32,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
-/**
- * The four mandatory delivery scenarios, run against the real DeliveryProcessor and the real
- * FailureSimulatingSender. Only the repository, the transaction manager and the real
- * email sender are mocked.
- */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class DeliveryProcessorTest {
@@ -48,6 +45,14 @@ class DeliveryProcessorTest {
     private PlatformTransactionManager transactionManager;
 
     private Notification notification;
+
+    @Mock
+    private NotificationSender sender;
+
+    @Mock
+    private TransactionTemplate transactionTemplate;
+
+    private final Clock clock = Clock.systemDefaultZone();
 
     @BeforeEach
     void setUp() {
@@ -80,8 +85,6 @@ class DeliveryProcessorTest {
         }
     }
 
-    // Scenario 1: success
-
     @Test
     void success_firstAttemptMarksNotificationSent() {
         DeliveryProcessor processor = processorWith(failingFirst(0));
@@ -94,8 +97,6 @@ class DeliveryProcessorTest {
         assertTrue(notification.getAttempts().getFirst().isSuccess());
         assertNull(notification.getAttempts().getFirst().getErrorMessage());
     }
-
-    // Scenario 2: failure followed by success
 
     @Test
     void failureThenSuccess_isRetriedAndEndsSent() {
@@ -115,8 +116,6 @@ class DeliveryProcessorTest {
         assertNotNull(history.get(0).getErrorMessage());
         assertTrue(history.get(1).isSuccess());
     }
-
-    // Scenario 3: several consecutive failures, still below the limit
 
     @Test
     void severalFailuresBelowLimit_staysPendingUntilItSucceeds() {
@@ -203,5 +202,89 @@ class DeliveryProcessorTest {
         notification.recordAttempt(false, "Simulated failure");
 
         assertDoesNotThrow(() -> sender.send(notification));
+    }
+    @Test
+    void permanentFailure_marksFailedImmediatelyAndStopsRetrying() {
+        NotificationSender failing = n -> {
+            throw new PermanentDeliveryException("Invalid recipient");
+        };
+
+        DeliveryProcessor processor = processorWith(failing);
+
+        processor.processDueNotifications();
+
+        assertEquals(NotificationStatus.FAILED, notification.getStatus());
+        assertEquals(1, notification.getAttemptCount());
+        assertEquals(1, notification.getAttempts().size());
+        assertFalse(notification.getAttempts().getFirst().isSuccess());
+        assertEquals(
+                "PermanentDeliveryException: Invalid recipient",
+                notification.getAttempts().getFirst().getErrorMessage()
+        );
+        assertNull(notification.getNextAttemptAt());
+
+        // A terminal notification must not be attempted again.
+        processor.processDueNotifications();
+
+        assertEquals(1, notification.getAttemptCount());
+    }
+    @Test
+    void unexpectedFailure_marksFailedImmediatelyAndStopsRetrying() {
+        NotificationSender failing = n -> {
+            throw new IllegalStateException("Unexpected programming error");
+        };
+
+        DeliveryProcessor processor = processorWith(failing);
+
+        processor.processDueNotifications();
+
+        assertEquals(NotificationStatus.FAILED, notification.getStatus());
+        assertEquals(1, notification.getAttemptCount());
+        assertEquals(1, notification.getAttempts().size());
+        assertFalse(notification.getAttempts().getFirst().isSuccess());
+        assertEquals(
+                "IllegalStateException: Unexpected programming error",
+                notification.getAttempts().getFirst().getErrorMessage()
+        );
+        assertNull(notification.getNextAttemptAt());
+
+        processor.processDueNotifications();
+
+        assertEquals(1, notification.getAttemptCount());
+    }
+    @Test
+    void retryableFailure_staysPendingUntilMaximumAttempts() {
+        NotificationSender failing = n -> {
+            throw new RetryableDeliveryException("Temporary SMTP failure");
+        };
+
+        DeliveryProcessor processor = processorWith(failing);
+
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            processor.processDueNotifications();
+
+            if (attempt < MAX_ATTEMPTS) {
+                assertEquals(NotificationStatus.PENDING, notification.getStatus());
+            }
+        }
+
+        assertEquals(NotificationStatus.FAILED, notification.getStatus());
+        assertEquals(MAX_ATTEMPTS, notification.getAttemptCount());
+        assertEquals(MAX_ATTEMPTS, notification.getAttempts().size());
+        assertNull(notification.getNextAttemptAt());
+    }
+
+    @Test
+    void constructor_withZeroMaxAttempts_throwsException() {
+        assertThrows(IllegalArgumentException.class, () ->
+                new DeliveryProcessor(
+                        repository,
+                        sender,
+                        transactionTemplate,
+                        clock,
+                        0,
+                        Duration.ofSeconds(30)
+                )
+        );
     }
 }

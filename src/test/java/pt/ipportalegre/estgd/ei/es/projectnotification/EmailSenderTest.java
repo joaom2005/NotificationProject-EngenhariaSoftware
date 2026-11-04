@@ -9,6 +9,7 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import pt.ipportalegre.estgd.ei.es.projectnotification.sender.EmailSender;
 import pt.ipportalegre.estgd.ei.es.projectnotification.entity.Notification;
+import pt.ipportalegre.estgd.ei.es.projectnotification.sender.PermanentDeliveryException;
 
 import java.util.List;
 
@@ -62,7 +63,7 @@ class EmailSenderTest {
         EmailSender sender = new EmailSender(mailSender, "noreply@example.com");
         Notification notification = new Notification(List.of(), "Subject", "Body");
 
-        assertThrows(IllegalArgumentException.class, () -> sender.send(notification));
+        assertThrows(PermanentDeliveryException.class, () -> sender.send(notification));
 
         verify(mailSender, never()).send(any(SimpleMailMessage.class));
     }

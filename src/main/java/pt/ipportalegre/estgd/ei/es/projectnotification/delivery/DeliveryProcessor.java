@@ -11,6 +11,9 @@ import pt.ipportalegre.estgd.ei.es.projectnotification.entity.NotificationStatus
 import pt.ipportalegre.estgd.ei.es.projectnotification.repository.NotificationRepository;
 import pt.ipportalegre.estgd.ei.es.projectnotification.sender.NotificationSender;
 
+import pt.ipportalegre.estgd.ei.es.projectnotification.sender.PermanentDeliveryException;
+import pt.ipportalegre.estgd.ei.es.projectnotification.sender.RetryableDeliveryException;
+
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -45,6 +48,14 @@ public class DeliveryProcessor {
             Clock clock,
             @Value("${app.delivery.max-attempts:5}") int maxAttempts,
             @Value("${app.delivery.retry-delay:30s}") Duration retryDelay) {
+        if (maxAttempts < 1) {
+            throw new IllegalArgumentException("Maximum attempts must be at least 1");
+        }
+
+        if (retryDelay.isNegative()) {
+            throw new IllegalArgumentException("Retry delay cannot be negative");
+        }
+
         this.repository = repository;
         this.sender = sender;
         this.transactionTemplate = transactionTemplate;
@@ -74,16 +85,27 @@ public class DeliveryProcessor {
     private void deliver(Notification notification) {
         Long id = notification.getId();
         String error = null;
+        boolean retryable = false;
 
         try {
             sender.send(notification);
+        } catch (RetryableDeliveryException e) {
+            error = e.getClass().getSimpleName() + ": " + e.getMessage();
+            retryable = true;
+            log.warn("Delivery of notification {} failed: {}", id, error);
+        } catch (PermanentDeliveryException e) {
+            error = e.getClass().getSimpleName() + ": " + e.getMessage();
+            log.warn("Permanent delivery failure for notification {}: {}", id, error);
         } catch (RuntimeException e) {
             error = e.getClass().getSimpleName() + ": " + e.getMessage();
-            log.warn("Delivery of notification {} failed: {}", id, error);
+            log.error("Unexpected error delivering notification {}", id, e);
         }
 
         String failure = error;
-        transactionTemplate.executeWithoutResult(status -> recordOutcome(id, failure));
+        boolean canRetry = retryable;
+
+        transactionTemplate.executeWithoutResult(
+                status -> recordOutcome(id, failure, canRetry));
     }
 
     /**
@@ -92,7 +114,7 @@ public class DeliveryProcessor {
      *
      * @param error failure description, or null if the attempt succeeded
      */
-    private void recordOutcome(Long id, String error) {
+    private void recordOutcome(Long id, String error, boolean retryable) {
         Notification notification = repository.findById(id).orElse(null);
         if (notification == null || notification.getStatus() != NotificationStatus.PENDING) {
             log.warn("Notification {} is no longer pending, outcome not recorded", id);
@@ -105,7 +127,7 @@ public class DeliveryProcessor {
         if (success) {
             notification.setStatus(NotificationStatus.SENT);
             notification.setNextAttemptAt(null);
-        } else if (notification.getAttemptCount() >= maxAttempts) {
+        } else if (!retryable || notification.getAttemptCount() >= maxAttempts) {
             notification.setStatus(NotificationStatus.FAILED);
             notification.setNextAttemptAt(null);
         } else {
