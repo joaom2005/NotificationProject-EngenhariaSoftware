@@ -15,7 +15,6 @@ import pt.ipportalegre.estgd.ei.es.projectnotification.entity.DeliveryAttempt;
 import pt.ipportalegre.estgd.ei.es.projectnotification.entity.Notification;
 import pt.ipportalegre.estgd.ei.es.projectnotification.entity.NotificationStatus;
 import pt.ipportalegre.estgd.ei.es.projectnotification.repository.NotificationRepository;
-import pt.ipportalegre.estgd.ei.es.projectnotification.sender.EmailSender;
 import pt.ipportalegre.estgd.ei.es.projectnotification.sender.FailureSimulatingSender;
 import pt.ipportalegre.estgd.ei.es.projectnotification.sender.NotificationSender;
 import pt.ipportalegre.estgd.ei.es.projectnotification.sender.SimulatedDeliveryException;
@@ -48,9 +47,6 @@ class DeliveryProcessorTest {
     @Mock
     private PlatformTransactionManager transactionManager;
 
-    @Mock
-    private EmailSender emailSender;
-
     private Notification notification;
 
     @BeforeEach
@@ -74,7 +70,7 @@ class DeliveryProcessorTest {
 
     /** Simulated sender that fails the first {@code failures} attempts of each notification. */
     private NotificationSender failingFirst(int failures) {
-        return new FailureSimulatingSender(emailSender, failures);
+        return new FailureSimulatingSender(failures);
     }
 
     /** Runs scheduler ticks until nothing is pending anymore (bounded, to avoid endless loops). */
@@ -97,7 +93,6 @@ class DeliveryProcessorTest {
         assertEquals(1, notification.getAttempts().size());
         assertTrue(notification.getAttempts().getFirst().isSuccess());
         assertNull(notification.getAttempts().getFirst().getErrorMessage());
-        verify(emailSender, times(1)).send(notification);
     }
 
     // Scenario 2: failure followed by success
@@ -119,7 +114,6 @@ class DeliveryProcessorTest {
         assertFalse(history.get(0).isSuccess());
         assertNotNull(history.get(0).getErrorMessage());
         assertTrue(history.get(1).isSuccess());
-        verify(emailSender, times(1)).send(notification);
     }
 
     // Scenario 3: several consecutive failures, still below the limit
@@ -134,13 +128,11 @@ class DeliveryProcessorTest {
         // Two failures in a row: not given up yet
         assertEquals(NotificationStatus.PENDING, notification.getStatus());
         assertEquals(2, notification.getAttemptCount());
-        verify(emailSender, never()).send(any());
 
         runUntilSettled(processor);
 
         assertEquals(NotificationStatus.SENT, notification.getStatus());
         assertEquals(MAX_ATTEMPTS, notification.getAttemptCount());
-        verify(emailSender, times(1)).send(notification);
     }
 
     // Scenario 4: maximum number of attempts reached
@@ -155,7 +147,6 @@ class DeliveryProcessorTest {
         assertEquals(MAX_ATTEMPTS, notification.getAttemptCount());
         assertEquals(MAX_ATTEMPTS, notification.getAttempts().size());
         assertTrue(notification.getAttempts().stream().noneMatch(DeliveryAttempt::isSuccess));
-        verify(emailSender, never()).send(any());
 
         // Terminal state: further ticks must not try again
         processor.processDueNotifications();
@@ -183,7 +174,7 @@ class DeliveryProcessorTest {
         processor.processDueNotifications();
 
         assertEquals("IllegalStateException: SMTP down",
-                notification.getAttempts().get(0).getErrorMessage());
+                notification.getAttempts().getFirst().getErrorMessage());
     }
 
     @Test
@@ -202,10 +193,15 @@ class DeliveryProcessorTest {
 
     @Test
     void simulatedSenderFailsOnlyUntilConfiguredNumberOfAttempts() {
-        FailureSimulatingSender sender = new FailureSimulatingSender(emailSender, 1);
+        FailureSimulatingSender sender = new FailureSimulatingSender(1);
 
-        assertThrows(SimulatedDeliveryException.class, () -> sender.send(notification));
-        notification.recordAttempt(false, "x");
+        assertThrows(
+                SimulatedDeliveryException.class,
+                () -> sender.send(notification)
+        );
+
+        notification.recordAttempt(false, "Simulated failure");
+
         assertDoesNotThrow(() -> sender.send(notification));
     }
 }

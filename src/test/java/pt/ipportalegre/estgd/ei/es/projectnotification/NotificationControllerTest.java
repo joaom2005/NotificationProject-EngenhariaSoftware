@@ -60,7 +60,7 @@ class NotificationControllerTest {
     void list_putsNotificationsInModel() throws Exception {
         List<Notification> notifications = List.of(
                 new Notification(List.of("a@example.com"), "One", "Body"));
-        when(notificationService.getNotifications()).thenReturn(notifications);
+        when(notificationService.getSortedNotifications()).thenReturn(notifications);
 
         mockMvc.perform(get("/notifications"))
                 .andExpect(status().isOk())
