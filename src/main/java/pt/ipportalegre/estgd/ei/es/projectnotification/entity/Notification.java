@@ -34,8 +34,11 @@ public class Notification {
 
     // Delivery tracking
 
+    // The column default only matters for rows created before delivery tracking existed:
+    // they were sent synchronously, so SENT is correct and the scheduler will not resend them.
+    // New notifications always get an explicit PENDING from this field initializer.
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "varchar(20) default 'SENT'")
     private NotificationStatus status = NotificationStatus.PENDING;
 
     /** Number of delivery attempts made so far (successful or not). */

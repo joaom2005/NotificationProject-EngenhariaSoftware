@@ -21,6 +21,10 @@
 
         <nav>
             <a th:href="@{/notifications}">Notifications</a>
+            <a class="button button-primary"
+               th:href="@{/notifications/create}">
+                New Notification
+            </a>
         </nav>
     </div>
 </header>
@@ -79,6 +83,7 @@
                 <th>ID</th>
                 <th>Subject</th>
                 <th>Recipients</th>
+                <th>Status</th>
                 <th>Date</th>
                 <th></th>
             </tr>
@@ -102,6 +107,19 @@
                     <div th:each="recipient : ${notification.recipients}"
                          th:text="${recipient}">
                         recipient@example.com
+                    </div>
+                </td>
+
+                <td>
+                    <span class="status"
+                          th:classappend="${notification.status.name() == 'SENT'} ? 'status-success' : (${notification.status.name() == 'FAILED'} ? 'status-failed' : 'status-pending')"
+                          th:text="${notification.status}">
+                        PENDING
+                    </span>
+                    <div class="subtitle"
+                         th:if="${notification.attemptCount > 0}"
+                         th:text="${notification.attemptCount} + ' attempt(s)'">
+                        1 attempt(s)
                     </div>
                 </td>
 

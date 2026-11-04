@@ -238,6 +238,11 @@ td small {
     color: #92400e;
 }
 
+.status-failed {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
 
 /* =========================
    Forms

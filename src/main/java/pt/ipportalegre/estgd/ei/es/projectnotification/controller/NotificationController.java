@@ -56,7 +56,7 @@ public class NotificationController {
 
 
         /**
-         * Creates and sends a new notification.
+         * Queues a new notification for delivery. It is sent asynchronously by the delivery scheduler.
          */
         @PostMapping("/notifications")
         public String create(
@@ -72,7 +72,7 @@ public class NotificationController {
             }
 
             notificationService.createNotification(notification);
-            redirectAttributes.addFlashAttribute("successMessage", "Notification created successfully.");
+            redirectAttributes.addFlashAttribute("successMessage", "Notification queued for delivery.");
             return "redirect:/notifications";
         }
 

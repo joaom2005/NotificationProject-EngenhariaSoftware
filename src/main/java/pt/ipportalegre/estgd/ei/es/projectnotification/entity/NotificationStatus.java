@@ -10,7 +10,13 @@ package pt.ipportalegre.estgd.ei.es.projectnotification.entity;
  * </pre>
  */
 public enum NotificationStatus {
+
+    /** Saved, but not delivered yet. Eligible for (re)processing. */
     PENDING,
+
+    /** Delivered successfully. Terminal state. */
     SENT,
+
+    /** Delivery was abandoned after reaching the maximum number of attempts. Terminal state. */
     FAILED
 }

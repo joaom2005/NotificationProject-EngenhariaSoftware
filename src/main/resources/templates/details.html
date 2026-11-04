@@ -70,6 +70,20 @@
             </div>
         </div>
 
+        <div class="detail-row">
+            <span class="detail-label">Status</span>
+            <div>
+                <span class="status"
+                      th:classappend="${notification.status.name() == 'SENT'} ? 'status-success' : (${notification.status.name() == 'FAILED'} ? 'status-failed' : 'status-pending')"
+                      th:text="${notification.status}">
+                    PENDING
+                </span>
+                <span class="subtitle"
+                      th:text="' ' + ${notification.attemptCount} + ' attempt(s)'">
+                </span>
+            </div>
+        </div>
+
         <hr>
 
         <div class="message">
@@ -77,6 +91,42 @@
             <p th:text="${notification.message}">
                 This is the notification message.
             </p>
+        </div>
+    </div>
+
+    <!-- Delivery history -->
+    <div class="card notification-details">
+        <h2>Delivery history</h2>
+
+        <p class="subtitle" th:if="${#lists.isEmpty(notification.attempts)}">
+            No delivery attempts yet. The notification is waiting to be processed.
+        </p>
+
+        <div class="table-container" th:if="${!#lists.isEmpty(notification.attempts)}">
+            <table>
+                <thead>
+                <tr>
+                    <th>#</th>
+                    <th>When</th>
+                    <th>Result</th>
+                    <th>Error</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="attempt : ${notification.attempts}">
+                    <td th:text="${attempt.attemptNumber}">1</td>
+                    <td th:text="${attempt.attemptedAt}">2026-11-04 12:00</td>
+                    <td>
+                        <span class="status"
+                              th:classappend="${attempt.success} ? 'status-success' : 'status-failed'"
+                              th:text="${attempt.success} ? 'OK' : 'FAILED'">
+                            OK
+                        </span>
+                    </td>
+                    <td th:text="${attempt.errorMessage}">-</td>
+                </tr>
+                </tbody>
+            </table>
         </div>
     </div>
 </main>

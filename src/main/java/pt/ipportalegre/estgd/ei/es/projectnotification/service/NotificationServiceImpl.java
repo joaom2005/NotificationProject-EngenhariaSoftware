@@ -8,21 +8,20 @@ import org.springframework.stereotype.Service;
 import pt.ipportalegre.estgd.ei.es.projectnotification.dto.NotificationRequest;
 import pt.ipportalegre.estgd.ei.es.projectnotification.entity.Notification;
 import pt.ipportalegre.estgd.ei.es.projectnotification.repository.NotificationRepository;
-import pt.ipportalegre.estgd.ei.es.projectnotification.sender.NotificationSender;
 
 import java.util.List;
 
+/**
+ * Handles notification requests. It does NOT deliver anything: it only stores the
+ * notification as PENDING. Delivery is picked up later by the delivery component.
+ */
 @Service
 public class NotificationServiceImpl implements NotificationUseCases {
 
     private final NotificationRepository notificationRepository;
-    private final NotificationSender sender;
 
-    public NotificationServiceImpl(
-            NotificationRepository notificationRepository,
-            NotificationSender sender) {
+    public NotificationServiceImpl(NotificationRepository notificationRepository) {
         this.notificationRepository = notificationRepository;
-        this.sender = sender;
     }
 
     @Override
@@ -43,10 +42,10 @@ public class NotificationServiceImpl implements NotificationUseCases {
 
     @Override
     public void createNotification(NotificationRequest request) {
-        Notification notification = notificationRepository.save(new Notification(
+        // A new Notification starts as PENDING, so saving it is enough to queue it
+        notificationRepository.save(new Notification(
                 request.getRecipients(),
                 request.getSubject(),
                 request.getMessage()));
-        sender.send(notification);
     }
 }
