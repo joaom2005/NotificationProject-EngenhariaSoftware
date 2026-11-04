@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Entity
@@ -31,6 +32,25 @@ public class Notification {
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
+    // Delivery tracking
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private NotificationStatus status = NotificationStatus.PENDING;
+
+    /** Number of delivery attempts made so far (successful or not). */
+    @Column(nullable = false)
+    private int attemptCount = 0;
+
+    /** Earliest moment the next attempt may run. Null means "as soon as possible". */
+    private LocalDateTime nextAttemptAt;
+
+    // LAZY on purpose: 'recipients' is already an EAGER List, and fetching two
+    // eager Lists at once makes Hibernate throw MultipleBagFetchException.
+    @OneToMany(mappedBy = "notification", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("attemptNumber ASC")
+    private List<DeliveryAttempt> attempts = new ArrayList<>();
+
     // Constructors
 
     public Notification() {
@@ -43,6 +63,22 @@ public class Notification {
         this.message = message;
         this.createdAt = LocalDateTime.now();
     }
+
+    // Delivery behaviour
+
+    /**
+     * Records one delivery attempt: appends it to the history and bumps the counter.
+     * Does NOT change the status; deciding between PENDING, SENT and FAILED
+     * is the job of the delivery component, which knows the retry policy.
+     */
+    public DeliveryAttempt recordAttempt(boolean success, String errorMessage) {
+        attemptCount++;
+        DeliveryAttempt attempt = new DeliveryAttempt(this, attemptCount, success, errorMessage);
+        attempts.add(attempt);
+        return attempt;
+    }
+
+    // Getters and setters
 
     public Long getId() {
         return id;
@@ -70,5 +106,28 @@ public class Notification {
     }
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public NotificationStatus getStatus() {
+        return status;
+    }
+    public void setStatus(NotificationStatus status) {
+        this.status = status;
+    }
+
+    public int getAttemptCount() {
+        return attemptCount;
+    }
+
+    public LocalDateTime getNextAttemptAt() {
+        return nextAttemptAt;
+    }
+    public void setNextAttemptAt(LocalDateTime nextAttemptAt) {
+        this.nextAttemptAt = nextAttemptAt;
+    }
+
+    /** Read-only view of the delivery history, oldest attempt first. */
+    public List<DeliveryAttempt> getAttempts() {
+        return Collections.unmodifiableList(attempts);
     }
 }
