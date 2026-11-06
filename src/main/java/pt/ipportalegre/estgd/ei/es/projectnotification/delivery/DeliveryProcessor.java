@@ -20,7 +20,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * Delivers PENDING notifications and applies the retry policy.
+ * Delivers PENDING notifications and delegates the retry decision to RetryPolicy.
  *
  * <p>The notification row is the single source of truth: it is written to the database
  * before any delivery is attempted, and every outcome is written back afterwards, so a
@@ -38,30 +38,19 @@ public class DeliveryProcessor {
     private final NotificationSender sender;
     private final TransactionTemplate transactionTemplate;
     private final Clock clock;
-    private final int maxAttempts;
-    private final Duration retryDelay;
+    private final RetryPolicy retryPolicy;
 
     public DeliveryProcessor(
             NotificationRepository repository,
             NotificationSender sender,
             TransactionTemplate transactionTemplate,
             Clock clock,
-            @Value("${app.delivery.max-attempts:5}") int maxAttempts,
-            @Value("${app.delivery.retry-delay:30s}") Duration retryDelay) {
-        if (maxAttempts < 1) {
-            throw new IllegalArgumentException("Maximum attempts must be at least 1");
-        }
-
-        if (retryDelay.isNegative()) {
-            throw new IllegalArgumentException("Retry delay cannot be negative");
-        }
-
+            RetryPolicy retryPolicy) {
         this.repository = repository;
         this.sender = sender;
         this.transactionTemplate = transactionTemplate;
         this.clock = clock;
-        this.maxAttempts = maxAttempts;
-        this.retryDelay = retryDelay;
+        this.retryPolicy = retryPolicy;
     }
 
     /**
@@ -121,19 +110,17 @@ public class DeliveryProcessor {
             return;
         }
 
+        LocalDateTime now = LocalDateTime.now(clock);
+
         boolean success = (error == null);
-        notification.recordAttempt(success, error);
+        notification.recordAttempt(success, error, now);
 
         if (success) {
-            notification.setStatus(NotificationStatus.SENT);
-            notification.setNextAttemptAt(null);
-        } else if (!retryable || notification.getAttemptCount() >= maxAttempts) {
-            notification.setStatus(NotificationStatus.FAILED);
-            notification.setNextAttemptAt(null);
+            notification.markSent();
+        } else if (!retryable || !retryPolicy.hasAttemptsLeft(notification.getAttemptCount())) {
+            notification.markFailed();
         } else {
-            // Stays PENDING; wait a bit longer after each failure (linear backoff)
-            Duration delay = retryDelay.multipliedBy(notification.getAttemptCount());
-            notification.setNextAttemptAt(LocalDateTime.now(clock).plus(delay));
+            notification.scheduleRetry(retryPolicy.nextAttemptAt(notification.getAttemptCount(), now));
         }
 
         repository.save(notification);

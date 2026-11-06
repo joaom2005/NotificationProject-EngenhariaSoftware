@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 @Entity
 @Table(name = "notifications")
@@ -74,11 +75,37 @@ public class Notification {
      * Does NOT change the status; deciding between PENDING, SENT and FAILED
      * is the job of the delivery component, which knows the retry policy.
      */
-    public DeliveryAttempt recordAttempt(boolean success, String errorMessage) {
+    public DeliveryAttempt recordAttempt(boolean success, String errorMessage, LocalDateTime attemptedAt) {
         attemptCount++;
-        DeliveryAttempt attempt = new DeliveryAttempt(this, attemptCount, success, errorMessage);
+        DeliveryAttempt attempt = new DeliveryAttempt(this, attemptCount, success, errorMessage, attemptedAt);
         attempts.add(attempt);
         return attempt;
+    }
+
+    public void markSent() {
+        requirePending();
+        this.status = NotificationStatus.SENT;
+        this.nextAttemptAt = null;
+    }
+
+    /** PENDING -> FAILED. Terminal: no more attempts will be made. */
+    public void markFailed() {
+        requirePending();
+        this.status = NotificationStatus.FAILED;
+        this.nextAttemptAt = null;
+    }
+
+    /** PENDING -> PENDING, but not eligible for processing until the given moment. */
+    public void scheduleRetry(LocalDateTime nextAttemptAt) {
+        requirePending();
+        this.nextAttemptAt = Objects.requireNonNull(nextAttemptAt, "nextAttemptAt must not be null");
+    }
+
+    private void requirePending() {
+        if (status != NotificationStatus.PENDING) {
+            throw new IllegalStateException(
+                    "Notification " + id + " is " + status + " and can no longer change state");
+        }
     }
 
     // Getters and setters
@@ -114,9 +141,6 @@ public class Notification {
     public NotificationStatus getStatus() {
         return status;
     }
-    public void setStatus(NotificationStatus status) {
-        this.status = status;
-    }
 
     public int getAttemptCount() {
         return attemptCount;
@@ -124,9 +148,6 @@ public class Notification {
 
     public LocalDateTime getNextAttemptAt() {
         return nextAttemptAt;
-    }
-    public void setNextAttemptAt(LocalDateTime nextAttemptAt) {
-        this.nextAttemptAt = nextAttemptAt;
     }
 
     /** Read-only view of the delivery history, oldest attempt first. */

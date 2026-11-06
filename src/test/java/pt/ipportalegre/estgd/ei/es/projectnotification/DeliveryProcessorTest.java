@@ -11,6 +11,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import pt.ipportalegre.estgd.ei.es.projectnotification.delivery.DeliveryProcessor;
+import pt.ipportalegre.estgd.ei.es.projectnotification.delivery.RetryPolicy;
 import pt.ipportalegre.estgd.ei.es.projectnotification.entity.DeliveryAttempt;
 import pt.ipportalegre.estgd.ei.es.projectnotification.entity.Notification;
 import pt.ipportalegre.estgd.ei.es.projectnotification.entity.NotificationStatus;
@@ -46,14 +47,6 @@ class DeliveryProcessorTest {
 
     private Notification notification;
 
-    @Mock
-    private NotificationSender sender;
-
-    @Mock
-    private TransactionTemplate transactionTemplate;
-
-    private final Clock clock = Clock.systemDefaultZone();
-
     @BeforeEach
     void setUp() {
         notification = new Notification(List.of("a@example.com"), "Subject", "Body");
@@ -67,10 +60,10 @@ class DeliveryProcessorTest {
     }
 
     private DeliveryProcessor processorWith(NotificationSender sender) {
-        // retryDelay ZERO so every retry is due immediately; the clock is not under test here
         return new DeliveryProcessor(repository, sender,
                 new TransactionTemplate(transactionManager),
-                Clock.systemDefaultZone(), MAX_ATTEMPTS, Duration.ZERO);
+                Clock.systemDefaultZone(),
+                new RetryPolicy(MAX_ATTEMPTS, Duration.ZERO));
     }
 
     /** Simulated sender that fails the first {@code failures} attempts of each notification. */
@@ -180,7 +173,8 @@ class DeliveryProcessorTest {
     void retryIsDelayedUntilNextAttemptAt() {
         DeliveryProcessor delayed = new DeliveryProcessor(repository, failingFirst(-1),
                 new TransactionTemplate(transactionManager),
-                Clock.systemDefaultZone(), MAX_ATTEMPTS, Duration.ofMinutes(10));
+                Clock.systemDefaultZone(),
+                new RetryPolicy(MAX_ATTEMPTS, Duration.ofMinutes(10)));
 
         LocalDateTime before = LocalDateTime.now();
         delayed.processDueNotifications();
@@ -199,7 +193,7 @@ class DeliveryProcessorTest {
                 () -> sender.send(notification)
         );
 
-        notification.recordAttempt(false, "Simulated failure");
+        notification.recordAttempt(false, "Simulated failure", LocalDateTime.now());
 
         assertDoesNotThrow(() -> sender.send(notification));
     }
@@ -272,19 +266,5 @@ class DeliveryProcessorTest {
         assertEquals(MAX_ATTEMPTS, notification.getAttemptCount());
         assertEquals(MAX_ATTEMPTS, notification.getAttempts().size());
         assertNull(notification.getNextAttemptAt());
-    }
-
-    @Test
-    void constructor_withZeroMaxAttempts_throwsException() {
-        assertThrows(IllegalArgumentException.class, () ->
-                new DeliveryProcessor(
-                        repository,
-                        sender,
-                        transactionTemplate,
-                        clock,
-                        0,
-                        Duration.ofSeconds(30)
-                )
-        );
     }
 }

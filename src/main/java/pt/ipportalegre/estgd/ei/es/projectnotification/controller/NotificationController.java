@@ -65,9 +65,6 @@ public class NotificationController {
                 RedirectAttributes redirectAttributes) {
 
             if (result.hasErrors()) {
-                result.getFieldErrors().forEach(e ->
-                        System.out.println(e.getField() + " -> " + e.getDefaultMessage()));
-
                 return "create";
             }
 

@@ -38,12 +38,13 @@ public class DeliveryAttempt {
         // Required by JPA
     }
 
-    DeliveryAttempt(Notification notification, int attemptNumber, boolean success, String errorMessage) {
+    DeliveryAttempt(Notification notification, int attemptNumber, boolean success,
+                    String errorMessage, LocalDateTime attemptedAt) {
         this.notification = notification;
         this.attemptNumber = attemptNumber;
         this.success = success;
         this.errorMessage = errorMessage;
-        this.attemptedAt = LocalDateTime.now();
+        this.attemptedAt = attemptedAt;
     }
 
     public Long getId() {
