@@ -14,6 +14,7 @@ import pt.ipportalegre.estgd.ei.es.projectnotification.delivery.DeliveryProcesso
 import pt.ipportalegre.estgd.ei.es.projectnotification.delivery.RetryPolicy;
 import pt.ipportalegre.estgd.ei.es.projectnotification.entity.DeliveryAttempt;
 import pt.ipportalegre.estgd.ei.es.projectnotification.entity.Notification;
+import pt.ipportalegre.estgd.ei.es.projectnotification.entity.NotificationChannel;
 import pt.ipportalegre.estgd.ei.es.projectnotification.entity.NotificationStatus;
 import pt.ipportalegre.estgd.ei.es.projectnotification.repository.NotificationRepository;
 import pt.ipportalegre.estgd.ei.es.projectnotification.sender.FailureSimulatingSender;
@@ -21,7 +22,9 @@ import pt.ipportalegre.estgd.ei.es.projectnotification.sender.NotificationSender
 import pt.ipportalegre.estgd.ei.es.projectnotification.sender.SimulatedDeliveryException;
 import pt.ipportalegre.estgd.ei.es.projectnotification.sender.PermanentDeliveryException;
 import pt.ipportalegre.estgd.ei.es.projectnotification.sender.RetryableDeliveryException;
+import pt.ipportalegre.estgd.ei.es.projectnotification.sender.NotificationSenderRegistry;
 
+import java.util.function.Consumer;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -59,16 +62,36 @@ class DeliveryProcessorTest {
         when(repository.findById(any())).thenAnswer(inv -> Optional.of(notification));
     }
 
+    /** Builds a sender for the EMAIL channel whose send() runs the given behavior. */
+    private NotificationSender senderOf(Consumer<Notification> behavior) {
+        return new NotificationSender() {
+            @Override
+            public NotificationChannel channel() {
+                return NotificationChannel.EMAIL;
+            }
+
+            @Override
+            public void send(Notification notification) {
+                behavior.accept(notification);
+            }
+        };
+    }
+
     private DeliveryProcessor processorWith(NotificationSender sender) {
-        return new DeliveryProcessor(repository, sender,
+        return processorWith(sender, Duration.ZERO);
+    }
+
+    private DeliveryProcessor processorWith(NotificationSender sender, Duration retryDelay) {
+        return new DeliveryProcessor(repository,
+                new NotificationSenderRegistry(List.of(sender)),
                 new TransactionTemplate(transactionManager),
                 Clock.systemDefaultZone(),
-                new RetryPolicy(MAX_ATTEMPTS, Duration.ZERO));
+                new RetryPolicy(MAX_ATTEMPTS, retryDelay));
     }
 
     /** Simulated sender that fails the first {@code failures} attempts of each notification. */
     private NotificationSender failingFirst(int failures) {
-        return new FailureSimulatingSender(failures);
+        return new FailureSimulatingSender(NotificationChannel.EMAIL, failures);
     }
 
     /** Runs scheduler ticks until nothing is pending anymore (bounded, to avoid endless loops). */
@@ -160,7 +183,7 @@ class DeliveryProcessorTest {
 
     @Test
     void exceptionTypeOfFailureIsStoredInHistory() {
-        NotificationSender failing = n -> { throw new IllegalStateException("SMTP down"); };
+        NotificationSender failing = senderOf(n -> { throw new IllegalStateException("SMTP down"); });
         DeliveryProcessor processor = processorWith(failing);
 
         processor.processDueNotifications();
@@ -171,10 +194,7 @@ class DeliveryProcessorTest {
 
     @Test
     void retryIsDelayedUntilNextAttemptAt() {
-        DeliveryProcessor delayed = new DeliveryProcessor(repository, failingFirst(-1),
-                new TransactionTemplate(transactionManager),
-                Clock.systemDefaultZone(),
-                new RetryPolicy(MAX_ATTEMPTS, Duration.ofMinutes(10)));
+        DeliveryProcessor delayed = processorWith(failingFirst(-1), Duration.ofMinutes(10));
 
         LocalDateTime before = LocalDateTime.now();
         delayed.processDueNotifications();
@@ -186,7 +206,7 @@ class DeliveryProcessorTest {
 
     @Test
     void simulatedSenderFailsOnlyUntilConfiguredNumberOfAttempts() {
-        FailureSimulatingSender sender = new FailureSimulatingSender(1);
+        FailureSimulatingSender sender = new FailureSimulatingSender(NotificationChannel.EMAIL, 1);
 
         assertThrows(
                 SimulatedDeliveryException.class,
@@ -199,9 +219,9 @@ class DeliveryProcessorTest {
     }
     @Test
     void permanentFailure_marksFailedImmediatelyAndStopsRetrying() {
-        NotificationSender failing = n -> {
+        NotificationSender failing = senderOf(n -> {
             throw new PermanentDeliveryException("Invalid recipient");
-        };
+        });
 
         DeliveryProcessor processor = processorWith(failing);
 
@@ -224,9 +244,9 @@ class DeliveryProcessorTest {
     }
     @Test
     void unexpectedFailure_marksFailedImmediatelyAndStopsRetrying() {
-        NotificationSender failing = n -> {
+        NotificationSender failing = senderOf(n -> {
             throw new IllegalStateException("Unexpected programming error");
-        };
+        });
 
         DeliveryProcessor processor = processorWith(failing);
 
@@ -248,9 +268,9 @@ class DeliveryProcessorTest {
     }
     @Test
     void retryableFailure_staysPendingUntilMaximumAttempts() {
-        NotificationSender failing = n -> {
+        NotificationSender failing = senderOf(n -> {
             throw new RetryableDeliveryException("Temporary SMTP failure");
-        };
+        });
 
         DeliveryProcessor processor = processorWith(failing);
 

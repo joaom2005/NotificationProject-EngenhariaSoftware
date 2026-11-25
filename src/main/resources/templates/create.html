@@ -69,17 +69,31 @@
                 </p>
             </div>
 
+            <!-- Channel -->
+
+            <div class="form-group">
+                <label for="channel">Channel</label>
+
+                <select id="channel" th:field="*{channel}">
+                    <option th:each="c : ${channels}"
+                            th:value="${c}"
+                            th:text="${c}"
+                            th:attr="data-requires-recipients=${c.requiresRecipients()}">EMAIL</option>
+                </select>
+
+                <p class="form-error"
+                   th:if="${#fields.hasErrors('channel')}"
+                   th:errors="*{channel}">
+                </p>
+            </div>
+
             <!-- Recipients -->
 
             <div class="form-group">
                 <label for="recipients">Recipients</label>
 
-                <input
-                        type="text"
-                        id="recipients"
-                        th:field="*{recipients}"
-                        placeholder="a@example.com, b@example.com"
-                        required>
+                <input type="text" id="recipients" th:field="*{recipients}"
+                       placeholder="a@example.com, b@example.com">
 
                 <p class="form-error"
                    th:each="err : ${#fields.errors('recipients*')}"
@@ -134,6 +148,24 @@
     </div>
 
 </main>
+
+<script>
+    (function () {
+        const channel = document.getElementById('channel');
+        const group = document.getElementById('recipients-group');
+        const input = document.getElementById('recipients');
+
+        function update() {
+            const needs = channel.selectedOptions[0].dataset.requiresRecipients === 'true';
+            group.hidden = !needs;
+            input.required = needs;
+            input.disabled = !needs;   // disabled inputs are not submitted
+        }
+
+        channel.addEventListener('change', update);
+        update();   // also runs after a validation error re-renders the form
+    })();
+</script>
 
 </body>
 </html>

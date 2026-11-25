@@ -5,6 +5,7 @@ import jakarta.mail.Session;
 import jakarta.mail.Store;
 import jakarta.mail.search.HeaderTerm;
 
+import org.apache.logging.log4j.message.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -54,6 +55,7 @@ public class ImapDeliveryVerifier implements DeliveryVerifier {
             Folder folder = store.getFolder(sentFolderName);
             try {
                 folder.open(Folder.READ_ONLY);
+                // folder.search(new HeaderTerm("Inreplay-to", messageId)).length > 0
                 return folder.search(new HeaderTerm("Message-ID", messageId)).length > 0;
             } finally {
                 if (folder.isOpen()) {

@@ -20,6 +20,7 @@ import pt.ipportalegre.estgd.ei.es.projectnotification.sender.EmailSender;
 import pt.ipportalegre.estgd.ei.es.projectnotification.sender.PermanentDeliveryException;
 import pt.ipportalegre.estgd.ei.es.projectnotification.sender.RetryableDeliveryException;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Properties;
 
@@ -52,7 +53,7 @@ class EmailSenderTest {
 
     @Test
     void send_buildsSingleMessageWithAllRecipients() throws Exception {
-        EmailSender sender = new EmailSender(mailSender, verifier, "noreply@example.com");
+        EmailSender sender = new EmailSender(mailSender, verifier, "noreply@example.com", Duration.ZERO);
         Notification notification = new Notification(
                 List.of("a@example.com", "b@example.com"), "Subject", "Body");
 
@@ -70,7 +71,7 @@ class EmailSenderTest {
 
     @Test
     void send_withBlankFromAddress_doesNotSetFrom() throws Exception {
-        EmailSender sender = new EmailSender(mailSender, verifier, "");
+        EmailSender sender = new EmailSender(mailSender, verifier, "", Duration.ZERO);
         Notification notification = new Notification(List.of("a@example.com"), "Subject", "Body");
 
         MimeMessage sent = sendAndCapture(sender, notification);
@@ -80,7 +81,7 @@ class EmailSenderTest {
 
     @Test
     void send_usesDeterministicMessageId() throws Exception {
-        EmailSender sender = new EmailSender(mailSender, verifier, "noreply@example.com");
+        EmailSender sender = new EmailSender(mailSender, verifier, "noreply@example.com", Duration.ZERO);
         Notification notification = new Notification(List.of("a@example.com"), "Subject", "Body");
 
         MimeMessage sent = sendAndCapture(sender, notification);
@@ -91,7 +92,7 @@ class EmailSenderTest {
     @Test
     void send_whenAlreadyDelivered_doesNotSendAgain() {
         when(verifier.wasAlreadyDelivered(any())).thenReturn(true);
-        EmailSender sender = new EmailSender(mailSender, verifier, "noreply@example.com");
+        EmailSender sender = new EmailSender(mailSender, verifier, "noreply@example.com", Duration.ZERO);
         Notification notification = new Notification(List.of("a@example.com"), "Subject", "Body");
 
         assertDoesNotThrow(() -> sender.send(notification));
@@ -101,7 +102,7 @@ class EmailSenderTest {
 
     @Test
     void send_withoutRecipients_throwsAndSendsNothing() {
-        EmailSender sender = new EmailSender(mailSender, verifier, "noreply@example.com");
+        EmailSender sender = new EmailSender(mailSender, verifier, "noreply@example.com", Duration.ZERO);
         Notification notification = new Notification(List.of(), "Subject", "Body");
 
         assertThrows(PermanentDeliveryException.class, () -> sender.send(notification));
@@ -112,7 +113,7 @@ class EmailSenderTest {
     @Test
     void send_whenMailServerFails_throwsRetryable() {
         doThrow(new MailSendException("SMTP down")).when(mailSender).send(any(MimeMessage.class));
-        EmailSender sender = new EmailSender(mailSender, verifier, "noreply@example.com");
+        EmailSender sender = new EmailSender(mailSender, verifier, "noreply@example.com", Duration.ZERO);
         Notification notification = new Notification(List.of("a@example.com"), "Subject", "Body");
 
         assertThrows(RetryableDeliveryException.class, () -> sender.send(notification));
@@ -122,7 +123,7 @@ class EmailSenderTest {
     void send_whenAuthenticationFails_throwsPermanent() {
         doThrow(new MailAuthenticationException("bad credentials"))
                 .when(mailSender).send(any(MimeMessage.class));
-        EmailSender sender = new EmailSender(mailSender, verifier, "noreply@example.com");
+        EmailSender sender = new EmailSender(mailSender, verifier, "noreply@example.com", Duration.ZERO);
         Notification notification = new Notification(List.of("a@example.com"), "Subject", "Body");
 
         assertThrows(PermanentDeliveryException.class, () -> sender.send(notification));

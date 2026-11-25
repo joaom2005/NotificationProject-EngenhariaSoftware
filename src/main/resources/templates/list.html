@@ -83,6 +83,7 @@
                 <th>ID</th>
                 <th>Subject</th>
                 <th>Recipients</th>
+                <th>Channel</th>
                 <th>Status</th>
                 <th>Date</th>
                 <th></th>
@@ -109,6 +110,8 @@
                         recipient@example.com
                     </div>
                 </td>
+
+                <td th:text="${notification.channel}">EMAIL</td>
 
                 <td>
                     <span class="status"

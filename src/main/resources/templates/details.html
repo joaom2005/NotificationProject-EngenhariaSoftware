@@ -84,6 +84,32 @@
             </div>
         </div>
 
+        <div class="detail-row">
+            <span class="detail-label">Channel</span>
+            <div>
+        <span class="status status-channel"
+              th:text="${notification.channel}">
+            EMAIL
+        </span>
+            </div>
+        </div>
+
+        <div class="detail-row">
+            <span class="detail-label">Created</span>
+            <div th:text="${#temporals.format(notification.createdAt, 'yyyy-MM-dd HH:mm:ss')}">
+                2026-11-25 10:00:00
+            </div>
+        </div>
+
+        <!-- Only meaningful while a retry is scheduled -->
+        <div class="detail-row"
+             th:if="${notification.status.name() == 'PENDING' and notification.nextAttemptAt != null}">
+            <span class="detail-label">Next attempt</span>
+            <div th:text="${#temporals.format(notification.nextAttemptAt, 'yyyy-MM-dd HH:mm:ss')}">
+                2026-11-25 10:01:00
+            </div>
+        </div>
+
         <hr>
 
         <div class="message">

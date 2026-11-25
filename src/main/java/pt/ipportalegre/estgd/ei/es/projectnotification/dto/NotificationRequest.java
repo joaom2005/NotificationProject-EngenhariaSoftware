@@ -1,10 +1,13 @@
 package pt.ipportalegre.estgd.ei.es.projectnotification.dto;
 
 import jakarta.validation.constraints.*;
+import pt.ipportalegre.estgd.ei.es.projectnotification.entity.NotificationChannel;
+import pt.ipportalegre.estgd.ei.es.projectnotification.validation.ValidNotificationRequest;
 
 import java.util.ArrayList;
 import java.util.List;
 
+@ValidNotificationRequest
 public class NotificationRequest {
     @NotBlank(message = "Subject must not be blank")
     @Size(max = 255, message = "Subject must have at most 255 characters")
@@ -13,8 +16,10 @@ public class NotificationRequest {
     @NotBlank(message = "Message must not be blank")
     private String message;
 
-    @NotEmpty(message = "Enter at least one recipient")
-    private List<@NotBlank(message = "Empty email address") @Email(message = "Invalid email address") String> recipients = new ArrayList<>();
+    private List<String> recipients = new ArrayList<>();
+
+    @NotNull(message = "Select a channel")
+    private NotificationChannel channel = NotificationChannel.EMAIL;
 
     public String getSubject() {
         return subject;
@@ -30,11 +35,17 @@ public class NotificationRequest {
         this.message = message;
     }
 
-    public List<@NotBlank(message = "Empty email address") @Email(message = "Invalid email address") String> getRecipients(){
+    public List<String> getRecipients(){
         return recipients;
     }
-
-    public void setRecipients(List<@NotBlank(message = "Empty email address") @Email(message = "Invalid email address") String> recipients) {
+    public void setRecipients(List<String> recipients) {
         this.recipients = recipients;
+    }
+
+    public NotificationChannel getChannel() {
+        return channel;
+    }
+    public void setChannel(NotificationChannel channel) {
+        this.channel = channel;
     }
 }

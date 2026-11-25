@@ -1,47 +1,36 @@
-
 package pt.ipportalegre.estgd.ei.es.projectnotification.sender;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.Primary;
-import org.springframework.stereotype.Component;
-
 import pt.ipportalegre.estgd.ei.es.projectnotification.entity.Notification;
+import pt.ipportalegre.estgd.ei.es.projectnotification.entity.NotificationChannel;
 
 /**
- * Simulates notification delivery for development and demonstrations.
- * Fails the configured number of attempts, then reports success without
- * sending a real email.
- * Only active when app.delivery.simulate.enabled=true.
+ * Stand-in sender for development and demos: fails the configured number of attempts
+ * of each notification and then reports success, without delivering anything for real.
+ * Not a Spring component: DeliveryConfig builds one per channel when simulation is on.
  */
-@Component
-@Primary
-@ConditionalOnProperty(
-        name = "app.delivery.simulate.enabled",
-        havingValue = "true"
-)
 public class FailureSimulatingSender implements NotificationSender {
 
+    private final NotificationChannel channel;
     private final int failuresPerNotification;
 
-    public FailureSimulatingSender(
-            @Value("${app.delivery.simulate.failures-per-notification:2}")
-            int failuresPerNotification) {
+    public FailureSimulatingSender(NotificationChannel channel, int failuresPerNotification) {
+        this.channel = channel;
         this.failuresPerNotification = failuresPerNotification;
+    }
+
+    @Override
+    public NotificationChannel channel() {
+        return channel;
     }
 
     @Override
     public void send(Notification notification) {
         boolean alwaysFail = failuresPerNotification < 0;
 
-        if (alwaysFail ||
-                notification.getAttemptCount() < failuresPerNotification) {
+        if (alwaysFail || notification.getAttemptCount() < failuresPerNotification) {
             throw new SimulatedDeliveryException(
-                    "Simulated failure on attempt "
-                            + (notification.getAttemptCount() + 1)
-            );
+                    "Simulated failure on attempt " + (notification.getAttemptCount() + 1));
         }
-
-        // Simulated success: deliberately do not send a real email.
+        // Simulated success: deliberately delivers nothing.
     }
 }

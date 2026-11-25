@@ -11,6 +11,7 @@ import pt.ipportalegre.estgd.ei.es.projectnotification.entity.NotificationStatus
 import pt.ipportalegre.estgd.ei.es.projectnotification.repository.NotificationRepository;
 import pt.ipportalegre.estgd.ei.es.projectnotification.sender.NotificationSender;
 
+import pt.ipportalegre.estgd.ei.es.projectnotification.sender.NotificationSenderRegistry;
 import pt.ipportalegre.estgd.ei.es.projectnotification.sender.PermanentDeliveryException;
 import pt.ipportalegre.estgd.ei.es.projectnotification.sender.RetryableDeliveryException;
 
@@ -23,7 +24,7 @@ import java.util.List;
  * Delivers PENDING notifications and delegates the retry decision to RetryPolicy.
  *
  * <p>The notification row is the single source of truth: it is written to the database
- * before any delivery is attempted, and every outcome is written back afterwards, so a
+ * before any delivery is attempted, and every outcome is written back afterward, so a
  * crash or a failing sender can never make a notification disappear.
  *
  * <p>The sender is called OUTSIDE any transaction (a slow SMTP server must not hold a
@@ -35,19 +36,19 @@ public class DeliveryProcessor {
     private static final Logger log = LoggerFactory.getLogger(DeliveryProcessor.class);
 
     private final NotificationRepository repository;
-    private final NotificationSender sender;
+    private final NotificationSenderRegistry senderRegistry;
     private final TransactionTemplate transactionTemplate;
     private final Clock clock;
     private final RetryPolicy retryPolicy;
 
     public DeliveryProcessor(
             NotificationRepository repository,
-            NotificationSender sender,
+            NotificationSenderRegistry senderRegistry,
             TransactionTemplate transactionTemplate,
             Clock clock,
             RetryPolicy retryPolicy) {
         this.repository = repository;
-        this.sender = sender;
+        this.senderRegistry = senderRegistry;
         this.transactionTemplate = transactionTemplate;
         this.clock = clock;
         this.retryPolicy = retryPolicy;
@@ -64,8 +65,6 @@ public class DeliveryProcessor {
             try {
                 deliver(notification);
             } catch (RuntimeException e) {
-                // Most likely the database failed while recording the outcome.
-                // The notification stays PENDING and will be picked up again.
                 log.error("Could not process notification {}", notification.getId(), e);
             }
         }
@@ -77,7 +76,7 @@ public class DeliveryProcessor {
         boolean retryable = false;
 
         try {
-            sender.send(notification);
+            senderRegistry.forChannel(notification.getChannel()).send(notification);
         } catch (RetryableDeliveryException e) {
             error = e.getClass().getSimpleName() + ": " + e.getMessage();
             retryable = true;
@@ -94,7 +93,7 @@ public class DeliveryProcessor {
         boolean canRetry = retryable;
 
         transactionTemplate.executeWithoutResult(
-                status -> recordOutcome(id, failure, canRetry));
+                _ -> recordOutcome(id, failure, canRetry));
     }
 
     /**

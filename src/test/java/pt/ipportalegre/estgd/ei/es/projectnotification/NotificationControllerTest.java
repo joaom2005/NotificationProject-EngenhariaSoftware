@@ -103,8 +103,8 @@ class NotificationControllerTest {
                         .param("recipients", "not-an-email"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("create"))
-                // Errors on list items are registered per index, e.g. recipients[0]
-                .andExpect(model().attributeHasFieldErrors("notification", "recipients[0]"));
+                // The class-level validator attaches the error to the whole "recipients" property
+                .andExpect(model().attributeHasFieldErrors("notification", "recipients"));
 
         verifyNoInteractions(notificationService);
     }

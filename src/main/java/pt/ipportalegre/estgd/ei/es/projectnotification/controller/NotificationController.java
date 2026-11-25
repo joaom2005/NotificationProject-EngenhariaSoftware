@@ -10,6 +10,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import pt.ipportalegre.estgd.ei.es.projectnotification.dto.NotificationRequest;
 import pt.ipportalegre.estgd.ei.es.projectnotification.entity.Notification;
+import pt.ipportalegre.estgd.ei.es.projectnotification.entity.NotificationChannel;
 import pt.ipportalegre.estgd.ei.es.projectnotification.service.NotificationUseCases;
 
 import java.util.List;
@@ -18,6 +19,11 @@ import java.util.List;
 public class NotificationController {
 
         private final NotificationUseCases notificationService;
+
+        @ModelAttribute("channels")
+        public NotificationChannel[] channels() {
+            return NotificationChannel.values();
+        }
 
         public NotificationController(
                 NotificationUseCases notificationService) {

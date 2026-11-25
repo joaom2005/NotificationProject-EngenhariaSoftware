@@ -14,7 +14,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import pt.ipportalegre.estgd.ei.es.projectnotification.entity.Notification;
+import pt.ipportalegre.estgd.ei.es.projectnotification.entity.NotificationChannel;
 
+import java.time.Duration;
 import java.util.List;
 
 /**
@@ -30,14 +32,17 @@ public class EmailSender implements NotificationSender {
     private final JavaMailSender mailSender;
     private final DeliveryVerifier deliveryVerifier;
     private final String fromAddress;
+    private final Duration interSendDelay;
 
     public EmailSender(
             JavaMailSender mailSender,
             DeliveryVerifier deliveryVerifier,
-            @Value("${app.mail.from:}") String fromAddress) {
+            @Value("${app.mail.from:}") String fromAddress,
+            @Value("${app.delivery.email.send-delay:200ms}") Duration interSendDelay) {
         this.mailSender = mailSender;
         this.deliveryVerifier = deliveryVerifier;
         this.fromAddress = fromAddress;
+        this.interSendDelay = interSendDelay;
     }
 
     @Override
@@ -63,9 +68,25 @@ public class EmailSender implements NotificationSender {
         } catch (MailAuthenticationException e) {
             throw new PermanentDeliveryException("Mail authentication failed: " + e.getMessage());
         } catch (MailException e) {
-            throw new RetryableDeliveryException(
-                    "Email delivery failed: " + e.getMessage(), e);
+            throw new RetryableDeliveryException("Email delivery failed: " + e.getMessage(), e);
         }
+
+        pauseBeforeNextSend();
+    }
+
+    /** Keeps a steady pace towards the mail provider, which limits how fast we may send. */
+    private void pauseBeforeNextSend() {
+        try {
+            Thread.sleep(interSendDelay);
+        } catch (InterruptedException e) {
+            // Email already went out, so do not report a failure; just keep the interrupt flag
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    @Override
+    public NotificationChannel channel() {
+        return NotificationChannel.EMAIL;
     }
 
     private MimeMessage buildMessage(Notification notification, List<String> recipients) {
@@ -81,28 +102,11 @@ public class EmailSender implements NotificationSender {
             helper.setSubject(notification.getSubject());
             helper.setText(notification.getMessage());
 
-            // Spring keeps a Message-ID that is already set, so retries reuse the same one
             message.setHeader("Message-ID", MessageIds.forNotification(notification));
             return message;
         } catch (MessagingException e) {
-            // A message that cannot even be built will not build on a retry either
             throw new PermanentDeliveryException("Could not build email: " + e.getMessage());
         }
     }
 
-    /** MimeMessage normally generates a new Message-ID on send; this keeps ours. */
-    private static class FixedIdMimeMessage extends MimeMessage {
-
-        private final String messageId;
-
-        FixedIdMimeMessage(MimeMessage source, String messageId) throws MessagingException {
-            super(source);
-            this.messageId = messageId;
-        }
-
-        @Override
-        protected void updateMessageID() throws MessagingException {
-            setHeader("Message-ID", messageId);
-        }
-    }
 }

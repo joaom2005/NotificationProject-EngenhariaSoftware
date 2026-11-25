@@ -46,6 +46,7 @@ public class NotificationServiceImpl implements NotificationUseCases {
         notificationRepository.save(new Notification(
                 request.getRecipients(),
                 request.getSubject(),
-                request.getMessage()));
+                request.getMessage(),
+                request.getChannel()));
     }
 }

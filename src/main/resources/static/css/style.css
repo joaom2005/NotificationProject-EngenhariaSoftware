@@ -212,6 +212,11 @@ td small {
     color: #777;
 }
 
+.status-channel {
+    background: #e0e7ff;
+    color: #3730a3;
+}
+
 
 /* =========================
    Status

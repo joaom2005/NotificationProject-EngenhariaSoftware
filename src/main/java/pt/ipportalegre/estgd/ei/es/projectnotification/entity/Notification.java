@@ -55,6 +55,10 @@ public class Notification {
     @OrderBy("attemptNumber ASC")
     private List<DeliveryAttempt> attempts = new ArrayList<>();
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, columnDefinition = "varchar(20) default 'EMAIL'")
+    private NotificationChannel channel = NotificationChannel.EMAIL;
+
     // Constructors
 
     public Notification() {
@@ -62,9 +66,15 @@ public class Notification {
     }
 
     public Notification(List<String> recipients, String subject, String message) {
+        this(recipients, subject, message, NotificationChannel.EMAIL);
+    }
+
+    public Notification(List<String> recipients, String subject, String message,
+                        NotificationChannel channel) {
         this.recipients = new ArrayList<>(recipients);
         this.subject = subject;
         this.message = message;
+        this.channel = Objects.requireNonNull(channel, "channel must not be null");
         this.createdAt = LocalDateTime.now();
     }
 
@@ -153,5 +163,9 @@ public class Notification {
     /** Read-only view of the delivery history, oldest attempt first. */
     public List<DeliveryAttempt> getAttempts() {
         return Collections.unmodifiableList(attempts);
+    }
+
+    public NotificationChannel getChannel() {
+        return channel;
     }
 }
