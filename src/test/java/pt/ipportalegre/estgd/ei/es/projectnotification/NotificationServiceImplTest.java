@@ -11,6 +11,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import pt.ipportalegre.estgd.ei.es.projectnotification.dto.NotificationRequest;
 import pt.ipportalegre.estgd.ei.es.projectnotification.entity.Notification;
+import pt.ipportalegre.estgd.ei.es.projectnotification.entity.NotificationChannel;
 import pt.ipportalegre.estgd.ei.es.projectnotification.entity.NotificationStatus;
 import pt.ipportalegre.estgd.ei.es.projectnotification.repository.NotificationRepository;
 import pt.ipportalegre.estgd.ei.es.projectnotification.service.NotificationServiceImpl;
@@ -69,8 +70,8 @@ class NotificationServiceImplTest {
     @Test
     void getNotifications_returnsAllFromRepository() {
         List<Notification> expected = List.of(
-                new Notification(List.of("a@example.com"), "One", "Body 1"),
-                new Notification(List.of("b@example.com"), "Two", "Body 2"));
+                new Notification(List.of("a@example.com"), "One", "Body 1", NotificationChannel.EMAIL),
+                new Notification(List.of("b@example.com"), "Two", "Body 2", NotificationChannel.EMAIL));
         when(notificationRepository.findAll()).thenReturn(expected);
 
         assertEquals(expected, service.getNotifications());
@@ -78,7 +79,7 @@ class NotificationServiceImplTest {
 
     @Test
     void getNotification_whenFound_returnsIt() {
-        Notification notification = new Notification(List.of("a@example.com"), "One", "Body");
+        Notification notification = new Notification(List.of("a@example.com"), "One", "Body", NotificationChannel.EMAIL);
         when(notificationRepository.findById(1L)).thenReturn(Optional.of(notification));
 
         assertSame(notification, service.getNotification(1L));

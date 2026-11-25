@@ -14,6 +14,7 @@ import pt.ipportalegre.estgd.ei.es.projectnotification.controller.GlobalExceptio
 import pt.ipportalegre.estgd.ei.es.projectnotification.controller.NotificationController;
 import pt.ipportalegre.estgd.ei.es.projectnotification.dto.NotificationRequest;
 import pt.ipportalegre.estgd.ei.es.projectnotification.entity.Notification;
+import pt.ipportalegre.estgd.ei.es.projectnotification.entity.NotificationChannel;
 import pt.ipportalegre.estgd.ei.es.projectnotification.service.NotificationUseCases;
 
 import java.util.List;
@@ -59,7 +60,7 @@ class NotificationControllerTest {
     @Test
     void list_putsNotificationsInModel() throws Exception {
         List<Notification> notifications = List.of(
-                new Notification(List.of("a@example.com"), "One", "Body"));
+                new Notification(List.of("a@example.com"), "One", "Body", NotificationChannel.EMAIL));
         when(notificationService.getSortedNotifications()).thenReturn(notifications);
 
         mockMvc.perform(get("/notifications"))
@@ -124,7 +125,7 @@ class NotificationControllerTest {
 
     @Test
     void details_whenFound_putsNotificationInModel() throws Exception {
-        Notification notification = new Notification(List.of("a@example.com"), "One", "Body");
+        Notification notification = new Notification(List.of("a@example.com"), "One", "Body", NotificationChannel.EMAIL);
         when(notificationService.getNotification(1L)).thenReturn(notification);
 
         mockMvc.perform(get("/notifications/1"))

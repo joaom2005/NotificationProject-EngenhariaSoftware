@@ -9,6 +9,8 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.data.domain.Pageable;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import pt.ipportalegre.estgd.ei.es.projectnotification.delivery.DeliveryProcessor;
 import pt.ipportalegre.estgd.ei.es.projectnotification.delivery.RetryPolicy;
@@ -22,6 +24,7 @@ import pt.ipportalegre.estgd.ei.es.projectnotification.sender.NotificationSender
 import pt.ipportalegre.estgd.ei.es.projectnotification.sender.SimulatedDeliveryException;
 import pt.ipportalegre.estgd.ei.es.projectnotification.sender.PermanentDeliveryException;
 import pt.ipportalegre.estgd.ei.es.projectnotification.sender.RetryableDeliveryException;
+import pt.ipportalegre.estgd.ei.es.projectnotification.entity.NotificationPriority;
 import pt.ipportalegre.estgd.ei.es.projectnotification.sender.NotificationSenderRegistry;
 
 import java.util.function.Consumer;
@@ -30,6 +33,8 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.time.Instant;
+import java.time.ZoneOffset;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -42,24 +47,64 @@ class DeliveryProcessorTest {
 
     private static final int MAX_ATTEMPTS = 3;
 
+    /** Default retry delay. Must be > 0, otherwise a failed notification is due again inside the same poll. */
+    private static final Duration DEFAULT_RETRY_DELAY = Duration.ofMinutes(1);
+
+    /** Time that passes between two scheduler ticks; longer than any retry delay used in these tests. */
+    private static final Duration TICK_INTERVAL = Duration.ofMinutes(10);
+
+    private static final Long NOTIFICATION_ID = 1L;
+
     @Mock
     private NotificationRepository repository;
 
     @Mock
     private PlatformTransactionManager transactionManager;
 
+    @Mock
+    private Clock clock;
+
     private Notification notification;
+
+    private Instant currentTime;
 
     @BeforeEach
     void setUp() {
-        notification = new Notification(List.of("a@example.com"), "Subject", "Body");
+        currentTime = Instant.parse("2026-11-25T15:00:00Z");
+        when(clock.instant()).thenAnswer(invocation -> currentTime);
+        when(clock.getZone()).thenReturn(ZoneOffset.UTC);
+
+        // The channel must match the channel of the test senders (EMAIL),
+        // otherwise the registry has no sender and the delivery fails permanently.
+        notification = new Notification(List.of("a@example.com"), "Subject", "Body", NotificationChannel.EMAIL);
+        ReflectionTestUtils.setField(notification, "id", NOTIFICATION_ID);
 
         // The repository behaves like a tiny in-memory store holding this one notification:
-        // it only returns it from findDue while it is still PENDING.
-        when(repository.findDue(eq(NotificationStatus.PENDING), any(LocalDateTime.class)))
-                .thenAnswer(inv -> notification.getStatus() == NotificationStatus.PENDING
-                        ? List.of(notification) : List.of());
-        when(repository.findById(any())).thenAnswer(inv -> Optional.of(notification));
+        // it only returns it as a claim candidate while it is PENDING and due.
+        when(repository.findClaimCandidates(
+                eq(NotificationStatus.PENDING),
+                any(LocalDateTime.class),
+                eq(NotificationPriority.HIGH),
+                eq(NotificationPriority.NORMAL),
+                any(LocalDateTime.class),
+                any(LocalDateTime.class),
+                any(Pageable.class)))
+                .thenAnswer(invocation -> {
+                    LocalDateTime now = invocation.getArgument(1);
+                    LocalDateTime nextAttemptAt = notification.getNextAttemptAt();
+
+                    boolean due = notification.getStatus() == NotificationStatus.PENDING
+                            && (nextAttemptAt == null || !nextAttemptAt.isAfter(now));
+
+                    return due ? List.of(NOTIFICATION_ID) : List.<Long>of();
+                });
+
+        when(repository.findLockedById(NOTIFICATION_ID))
+                .thenReturn(Optional.of(notification));
+    }
+
+    private void advanceTime(Duration duration) {
+        currentTime = currentTime.plus(duration);
     }
 
     /** Builds a sender for the EMAIL channel whose send() runs the given behavior. */
@@ -78,14 +123,14 @@ class DeliveryProcessorTest {
     }
 
     private DeliveryProcessor processorWith(NotificationSender sender) {
-        return processorWith(sender, Duration.ZERO);
+        return processorWith(sender, DEFAULT_RETRY_DELAY);
     }
 
     private DeliveryProcessor processorWith(NotificationSender sender, Duration retryDelay) {
         return new DeliveryProcessor(repository,
                 new NotificationSenderRegistry(List.of(sender)),
                 new TransactionTemplate(transactionManager),
-                Clock.systemDefaultZone(),
+                clock,
                 new RetryPolicy(MAX_ATTEMPTS, retryDelay));
     }
 
@@ -94,12 +139,20 @@ class DeliveryProcessorTest {
         return new FailureSimulatingSender(NotificationChannel.EMAIL, failures);
     }
 
+    /** One scheduler tick: process what is due, then let time pass so any retry becomes due. */
+    private void tick(DeliveryProcessor processor) {
+        processor.processDueNotifications();
+        advanceTime(TICK_INTERVAL);
+    }
+
     /** Runs scheduler ticks until nothing is pending anymore (bounded, to avoid endless loops). */
     private void runUntilSettled(DeliveryProcessor processor) {
-        for (int tick = 0; tick < MAX_ATTEMPTS + 2; tick++) {
-            processor.processDueNotifications();
+        for (int i = 0; i < MAX_ATTEMPTS + 2; i++) {
+            tick(processor);
         }
     }
+
+    // Scenario 1: successful delivery
 
     @Test
     void success_firstAttemptMarksNotificationSent() {
@@ -114,31 +167,39 @@ class DeliveryProcessorTest {
         assertNull(notification.getAttempts().getFirst().getErrorMessage());
     }
 
+    // Scenario 2: failure followed by a successful attempt
+
     @Test
     void failureThenSuccess_isRetriedAndEndsSent() {
-        DeliveryProcessor processor = processorWith(failingFirst(1));
+        Duration retryDelay = Duration.ofMinutes(1);
+        DeliveryProcessor processor = processorWith(failingFirst(1), retryDelay);
 
         processor.processDueNotifications();
+
         // After the first failure the notification must still be alive and retryable
         assertEquals(NotificationStatus.PENDING, notification.getStatus());
         assertEquals(1, notification.getAttemptCount());
 
-        runUntilSettled(processor);
+        advanceTime(retryDelay);
+        processor.processDueNotifications();
 
         assertEquals(NotificationStatus.SENT, notification.getStatus());
         assertEquals(2, notification.getAttemptCount());
+
         List<DeliveryAttempt> history = notification.getAttempts();
         assertFalse(history.get(0).isSuccess());
         assertNotNull(history.get(0).getErrorMessage());
         assertTrue(history.get(1).isSuccess());
     }
 
+    // Scenario 3: several consecutive failures
+
     @Test
     void severalFailuresBelowLimit_staysPendingUntilItSucceeds() {
         DeliveryProcessor processor = processorWith(failingFirst(MAX_ATTEMPTS - 1));
 
-        processor.processDueNotifications();
-        processor.processDueNotifications();
+        tick(processor);
+        tick(processor);
 
         // Two failures in a row: not given up yet
         assertEquals(NotificationStatus.PENDING, notification.getStatus());
@@ -194,14 +255,23 @@ class DeliveryProcessorTest {
 
     @Test
     void retryIsDelayedUntilNextAttemptAt() {
-        DeliveryProcessor delayed = processorWith(failingFirst(-1), Duration.ofMinutes(10));
+        Duration retryDelay = Duration.ofMinutes(10);
+        DeliveryProcessor processor = processorWith(failingFirst(-1), retryDelay);
+        LocalDateTime startedAt = LocalDateTime.now(clock);
 
-        LocalDateTime before = LocalDateTime.now();
-        delayed.processDueNotifications();
-
+        processor.processDueNotifications();
         assertEquals(NotificationStatus.PENDING, notification.getStatus());
-        assertNotNull(notification.getNextAttemptAt());
-        assertTrue(notification.getNextAttemptAt().isAfter(before.plusMinutes(9)));
+        assertEquals(startedAt.plus(retryDelay), notification.getNextAttemptAt());
+
+        // One second before the retry is due: nothing happens
+        advanceTime(retryDelay.minusSeconds(1));
+        processor.processDueNotifications();
+        assertEquals(1, notification.getAttemptCount());
+
+        // Retry becomes due
+        advanceTime(Duration.ofSeconds(1));
+        processor.processDueNotifications();
+        assertEquals(2, notification.getAttemptCount());
     }
 
     @Test
@@ -217,6 +287,7 @@ class DeliveryProcessorTest {
 
         assertDoesNotThrow(() -> sender.send(notification));
     }
+
     @Test
     void permanentFailure_marksFailedImmediatelyAndStopsRetrying() {
         NotificationSender failing = senderOf(n -> {
@@ -242,6 +313,7 @@ class DeliveryProcessorTest {
 
         assertEquals(1, notification.getAttemptCount());
     }
+
     @Test
     void unexpectedFailure_marksFailedImmediatelyAndStopsRetrying() {
         NotificationSender failing = senderOf(n -> {
@@ -266,6 +338,7 @@ class DeliveryProcessorTest {
 
         assertEquals(1, notification.getAttemptCount());
     }
+
     @Test
     void retryableFailure_staysPendingUntilMaximumAttempts() {
         NotificationSender failing = senderOf(n -> {
@@ -275,7 +348,7 @@ class DeliveryProcessorTest {
         DeliveryProcessor processor = processorWith(failing);
 
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-            processor.processDueNotifications();
+            tick(processor);
 
             if (attempt < MAX_ATTEMPTS) {
                 assertEquals(NotificationStatus.PENDING, notification.getStatus());

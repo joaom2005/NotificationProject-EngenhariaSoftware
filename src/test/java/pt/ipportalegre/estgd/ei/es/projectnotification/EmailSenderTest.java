@@ -15,6 +15,7 @@ import org.springframework.mail.MailSendException;
 import org.springframework.mail.javamail.JavaMailSender;
 
 import pt.ipportalegre.estgd.ei.es.projectnotification.entity.Notification;
+import pt.ipportalegre.estgd.ei.es.projectnotification.entity.NotificationChannel;
 import pt.ipportalegre.estgd.ei.es.projectnotification.sender.DeliveryVerifier;
 import pt.ipportalegre.estgd.ei.es.projectnotification.sender.EmailSender;
 import pt.ipportalegre.estgd.ei.es.projectnotification.sender.PermanentDeliveryException;
@@ -55,7 +56,7 @@ class EmailSenderTest {
     void send_buildsSingleMessageWithAllRecipients() throws Exception {
         EmailSender sender = new EmailSender(mailSender, verifier, "noreply@example.com", Duration.ZERO);
         Notification notification = new Notification(
-                List.of("a@example.com", "b@example.com"), "Subject", "Body");
+                List.of("a@example.com", "b@example.com"), "Subject", "Body", NotificationChannel.EMAIL);
 
         MimeMessage sent = sendAndCapture(sender, notification);
 
@@ -72,7 +73,7 @@ class EmailSenderTest {
     @Test
     void send_withBlankFromAddress_doesNotSetFrom() throws Exception {
         EmailSender sender = new EmailSender(mailSender, verifier, "", Duration.ZERO);
-        Notification notification = new Notification(List.of("a@example.com"), "Subject", "Body");
+        Notification notification = new Notification(List.of("a@example.com"), "Subject", "Body", NotificationChannel.EMAIL);
 
         MimeMessage sent = sendAndCapture(sender, notification);
 
@@ -82,7 +83,7 @@ class EmailSenderTest {
     @Test
     void send_usesDeterministicMessageId() throws Exception {
         EmailSender sender = new EmailSender(mailSender, verifier, "noreply@example.com", Duration.ZERO);
-        Notification notification = new Notification(List.of("a@example.com"), "Subject", "Body");
+        Notification notification = new Notification(List.of("a@example.com"), "Subject", "Body", NotificationChannel.EMAIL);
 
         MimeMessage sent = sendAndCapture(sender, notification);
 
@@ -93,7 +94,7 @@ class EmailSenderTest {
     void send_whenAlreadyDelivered_doesNotSendAgain() {
         when(verifier.wasAlreadyDelivered(any())).thenReturn(true);
         EmailSender sender = new EmailSender(mailSender, verifier, "noreply@example.com", Duration.ZERO);
-        Notification notification = new Notification(List.of("a@example.com"), "Subject", "Body");
+        Notification notification = new Notification(List.of("a@example.com"), "Subject", "Body", NotificationChannel.EMAIL);
 
         assertDoesNotThrow(() -> sender.send(notification));
 
@@ -103,7 +104,7 @@ class EmailSenderTest {
     @Test
     void send_withoutRecipients_throwsAndSendsNothing() {
         EmailSender sender = new EmailSender(mailSender, verifier, "noreply@example.com", Duration.ZERO);
-        Notification notification = new Notification(List.of(), "Subject", "Body");
+        Notification notification = new Notification(List.of(), "Subject", "Body", NotificationChannel.EMAIL);
 
         assertThrows(PermanentDeliveryException.class, () -> sender.send(notification));
 
@@ -114,7 +115,7 @@ class EmailSenderTest {
     void send_whenMailServerFails_throwsRetryable() {
         doThrow(new MailSendException("SMTP down")).when(mailSender).send(any(MimeMessage.class));
         EmailSender sender = new EmailSender(mailSender, verifier, "noreply@example.com", Duration.ZERO);
-        Notification notification = new Notification(List.of("a@example.com"), "Subject", "Body");
+        Notification notification = new Notification(List.of("a@example.com"), "Subject", "Body", NotificationChannel.EMAIL);
 
         assertThrows(RetryableDeliveryException.class, () -> sender.send(notification));
     }
@@ -124,7 +125,7 @@ class EmailSenderTest {
         doThrow(new MailAuthenticationException("bad credentials"))
                 .when(mailSender).send(any(MimeMessage.class));
         EmailSender sender = new EmailSender(mailSender, verifier, "noreply@example.com", Duration.ZERO);
-        Notification notification = new Notification(List.of("a@example.com"), "Subject", "Body");
+        Notification notification = new Notification(List.of("a@example.com"), "Subject", "Body", NotificationChannel.EMAIL);
 
         assertThrows(PermanentDeliveryException.class, () -> sender.send(notification));
     }

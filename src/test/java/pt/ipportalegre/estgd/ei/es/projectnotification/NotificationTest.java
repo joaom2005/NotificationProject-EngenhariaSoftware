@@ -3,6 +3,7 @@ package pt.ipportalegre.estgd.ei.es.projectnotification;
 import org.junit.jupiter.api.Test;
 
 import pt.ipportalegre.estgd.ei.es.projectnotification.entity.Notification;
+import pt.ipportalegre.estgd.ei.es.projectnotification.entity.NotificationChannel;
 import pt.ipportalegre.estgd.ei.es.projectnotification.entity.NotificationStatus;
 
 import java.time.LocalDateTime;
@@ -13,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class NotificationTest {
 
     private Notification pending() {
-        return new Notification(List.of("a@example.com"), "Subject", "Body");
+        return new Notification(List.of("a@example.com"), "Subject", "Body", NotificationChannel.EMAIL);
     }
 
     LocalDateTime now = LocalDateTime.of(2026, 11, 25, 14, 0);
