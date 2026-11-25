@@ -2,6 +2,7 @@ package pt.ipportalegre.estgd.ei.es.projectnotification.dto;
 
 import jakarta.validation.constraints.*;
 import pt.ipportalegre.estgd.ei.es.projectnotification.entity.NotificationChannel;
+import pt.ipportalegre.estgd.ei.es.projectnotification.entity.NotificationPriority;
 import pt.ipportalegre.estgd.ei.es.projectnotification.validation.ValidNotificationRequest;
 
 import java.util.ArrayList;
@@ -20,6 +21,17 @@ public class NotificationRequest {
 
     @NotNull(message = "Select a channel")
     private NotificationChannel channel = NotificationChannel.EMAIL;
+
+    @NotNull(message = "Select a priority")
+    private NotificationPriority priority = NotificationPriority.NORMAL;
+
+    public NotificationPriority getPriority() {
+        return priority;
+    }
+
+    public void setPriority(NotificationPriority priority) {
+        this.priority = priority;
+    }
 
     public String getSubject() {
         return subject;

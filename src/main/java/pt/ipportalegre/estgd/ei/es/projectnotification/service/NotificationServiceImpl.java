@@ -47,6 +47,7 @@ public class NotificationServiceImpl implements NotificationUseCases {
                 request.getRecipients(),
                 request.getSubject(),
                 request.getMessage(),
-                request.getChannel()));
+                request.getChannel(),
+                request.getPriority()));
     }
 }

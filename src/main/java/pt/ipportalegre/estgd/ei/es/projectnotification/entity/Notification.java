@@ -33,6 +33,32 @@ public class Notification {
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
+    @Column(length = 36)
+    private String claimToken;
+
+    private LocalDateTime claimUntil;
+
+    public boolean tryClaim(String token, LocalDateTime now, LocalDateTime until) {
+        if (status != NotificationStatus.PENDING
+                || (nextAttemptAt != null && nextAttemptAt.isAfter(now))
+                || (claimUntil != null && claimUntil.isAfter(now))) {
+            return false;
+        }
+
+        claimToken = token;
+        claimUntil = until;
+        return true;
+    }
+
+    public boolean hasClaim(String token) {
+        return token.equals(claimToken);
+    }
+
+    public void clearClaim() {
+        claimToken = null;
+        claimUntil = null;
+    }
+
     // Delivery tracking
 
     // The column default only matters for rows created before delivery tracking existed:
@@ -66,22 +92,28 @@ public class Notification {
     @Column(nullable = false, columnDefinition = "varchar(20) default 'EMAIL'")
     private NotificationChannel channel = NotificationChannel.EMAIL;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, columnDefinition = "varchar(20) default 'NORMAL'")
+    private NotificationPriority priority = NotificationPriority.NORMAL;
+
     // Constructors
 
     public Notification() {
         this.createdAt = LocalDateTime.now();
     }
 
-    public Notification(List<String> recipients, String subject, String message) {
-        this(recipients, subject, message, NotificationChannel.EMAIL);
+    public Notification(List<String> recipients, String subject, String message,
+                        NotificationChannel channel) {
+        this(recipients, subject, message, channel, NotificationPriority.NORMAL);
     }
 
     public Notification(List<String> recipients, String subject, String message,
-                        NotificationChannel channel) {
+                        NotificationChannel channel, NotificationPriority priority) {
         this.recipients = new ArrayList<>(recipients);
         this.subject = subject;
         this.message = message;
         this.channel = Objects.requireNonNull(channel, "channel must not be null");
+        this.priority = Objects.requireNonNull(priority, "priority must not be null");
         this.createdAt = LocalDateTime.now();
     }
 
@@ -191,5 +223,9 @@ public class Notification {
 
     public NotificationChannel getChannel() {
         return channel;
+    }
+
+    public NotificationPriority getPriority() {
+        return priority;
     }
 }

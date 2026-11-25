@@ -24,4 +24,11 @@ public class DeliveryScheduler {
     public void poll() {
         processor.processDueNotifications();
     }
+
+    @Scheduled(
+            fixedDelayString = "${app.delivery.poll-interval-ms:5000}",
+            initialDelay = 2500)
+    public void pollSecondWorker() {
+        processor.processDueNotifications();
+    }
 }

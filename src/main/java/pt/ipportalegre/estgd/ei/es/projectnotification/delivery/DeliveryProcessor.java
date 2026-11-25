@@ -2,14 +2,14 @@ package pt.ipportalegre.estgd.ei.es.projectnotification.delivery;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.data.domain.PageRequest;
 
+import pt.ipportalegre.estgd.ei.es.projectnotification.entity.NotificationPriority;
 import pt.ipportalegre.estgd.ei.es.projectnotification.entity.Notification;
 import pt.ipportalegre.estgd.ei.es.projectnotification.entity.NotificationStatus;
 import pt.ipportalegre.estgd.ei.es.projectnotification.repository.NotificationRepository;
-import pt.ipportalegre.estgd.ei.es.projectnotification.sender.NotificationSender;
 
 import pt.ipportalegre.estgd.ei.es.projectnotification.sender.NotificationSenderRegistry;
 import pt.ipportalegre.estgd.ei.es.projectnotification.sender.PermanentDeliveryException;
@@ -19,6 +19,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Delivers PENDING notifications and delegates the retry decision to RetryPolicy.
@@ -41,6 +42,11 @@ public class DeliveryProcessor {
     private final Clock clock;
     private final RetryPolicy retryPolicy;
 
+    private static final Duration CLAIM_DURATION = Duration.ofMinutes(5);
+    private static final int MAX_ATTEMPTS_PER_POLL = 10;
+
+    private record ClaimedNotification(Notification notification, String token) {}
+
     public DeliveryProcessor(
             NotificationRepository repository,
             NotificationSenderRegistry senderRegistry,
@@ -59,18 +65,22 @@ public class DeliveryProcessor {
      * A problem with one notification never stops the others.
      */
     public void processDueNotifications() {
-        List<Notification> due = repository.findDue(NotificationStatus.PENDING, LocalDateTime.now(clock));
+        for (int i = 0; i < MAX_ATTEMPTS_PER_POLL; i++) {
+            ClaimedNotification claim = claimNext();
+            if (claim == null) {
+                return;
+            }
 
-        for (Notification notification : due) {
             try {
-                deliver(notification);
+                deliver(claim.notification(), claim.token());
             } catch (RuntimeException e) {
-                log.error("Could not process notification {}", notification.getId(), e);
+                log.error("Could not process notification {}",
+                        claim.notification().getId(), e);
             }
         }
     }
 
-    private void deliver(Notification notification) {
+    private void deliver(Notification notification, String token) {
         Long id = notification.getId();
         String error = null;
         boolean retryable = false;
@@ -93,7 +103,7 @@ public class DeliveryProcessor {
         boolean canRetry = retryable;
 
         transactionTemplate.executeWithoutResult(
-                _ -> recordOutcome(id, failure, canRetry));
+                transaction -> recordOutcome(id, token, failure, canRetry));
     }
 
     /**
@@ -102,10 +112,13 @@ public class DeliveryProcessor {
      *
      * @param error failure description, or null if the attempt succeeded
      */
-    private void recordOutcome(Long id, String error, boolean retryable) {
-        Notification notification = repository.findById(id).orElse(null);
-        if (notification == null || notification.getStatus() != NotificationStatus.PENDING) {
-            log.warn("Notification {} is no longer pending, outcome not recorded", id);
+    private void recordOutcome(Long id, String token, String error, boolean retryable) {
+        Notification notification = repository.findLockedById(id).orElse(null);
+
+        if (notification == null
+                || notification.getStatus() != NotificationStatus.PENDING
+                || !notification.hasClaim(token)) {
+            log.warn("Delivery claim for notification {} is no longer current", id);
             return;
         }
 
@@ -122,6 +135,48 @@ public class DeliveryProcessor {
             notification.scheduleRetry(retryPolicy.nextAttemptAt(notification.getAttemptCount(), now));
         }
 
+        notification.clearClaim();
         repository.save(notification);
+    }
+
+    private ClaimedNotification claimNext() {
+        // If another worker claims the same candidate first, read the queue again.
+        for (int attempt = 0; attempt < 3; attempt++) {
+            LocalDateTime now = LocalDateTime.now(clock);
+
+            List<Long> candidates = repository.findClaimCandidates(
+                    NotificationStatus.PENDING,
+                    now,
+                    NotificationPriority.HIGH,
+                    NotificationPriority.NORMAL,
+                    now.minusMinutes(5),
+                    now.minusMinutes(10),
+                    PageRequest.of(0, 1));
+
+            if (candidates.isEmpty()) {
+                return null;
+            }
+
+            Long id = candidates.getFirst();
+            String token = UUID.randomUUID().toString();
+
+            ClaimedNotification claim = transactionTemplate.execute(transaction -> {
+                Notification notification = repository.findLockedById(id).orElse(null);
+                LocalDateTime claimedAt = LocalDateTime.now(clock);
+
+                if (notification == null || !notification.tryClaim(
+                        token, claimedAt, claimedAt.plus(CLAIM_DURATION))) {
+                    return null;
+                }
+
+                return new ClaimedNotification(notification, token);
+            });
+
+            if (claim != null) {
+                return claim;
+            }
+        }
+
+        return null;
     }
 }
