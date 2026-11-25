@@ -115,7 +115,7 @@ public class DeliveryProcessor {
         notification.recordAttempt(success, error, now);
 
         if (success) {
-            notification.markSent();
+            notification.markSent(now);
         } else if (!retryable || !retryPolicy.hasAttemptsLeft(notification.getAttemptCount())) {
             notification.markFailed();
         } else {

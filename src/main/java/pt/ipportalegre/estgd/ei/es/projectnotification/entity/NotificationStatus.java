@@ -7,6 +7,7 @@ package pt.ipportalegre.estgd.ei.es.projectnotification.entity;
  * PENDING --(send ok)--------------------------> SENT
  * PENDING --(send fails, attempts left)--------> PENDING (retried later)
  * PENDING --(send fails, no attempts left)-----> FAILED
+ * SENT    --(bounce detected afterwards)-------> BOUNCED
  * </pre>
  */
 public enum NotificationStatus {
@@ -14,9 +15,12 @@ public enum NotificationStatus {
     /** Saved, but not delivered yet. Eligible for (re)processing. */
     PENDING,
 
-    /** Delivered successfully. Terminal state. */
+    /** Accepted by the mail server. Only BOUNCED can follow. */
     SENT,
 
     /** Delivery was abandoned after reaching the maximum number of attempts. Terminal state. */
-    FAILED
+    FAILED,
+
+    /** Accepted by our mail server, but rejected later by the recipient's side. Terminal state. */
+    BOUNCED
 }

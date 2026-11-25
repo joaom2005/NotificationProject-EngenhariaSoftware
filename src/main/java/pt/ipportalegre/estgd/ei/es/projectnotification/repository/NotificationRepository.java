@@ -1,5 +1,7 @@
 package pt.ipportalegre.estgd.ei.es.projectnotification.repository;
 
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -8,6 +10,7 @@ import org.springframework.stereotype.Repository;
 import pt.ipportalegre.estgd.ei.es.projectnotification.entity.Notification;
 import pt.ipportalegre.estgd.ei.es.projectnotification.entity.NotificationStatus;
 
+import java.util.Optional;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -27,4 +30,10 @@ public interface NotificationRepository
             """)
     List<Notification> findDue(@Param("status") NotificationStatus status,
                                @Param("now") LocalDateTime now);
+
+    List<Notification> findByStatusAndSentAtAfterOrderBySentAtAsc(NotificationStatus status,
+                                                                  LocalDateTime since);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<Notification> findLockedById(Long id);
 }

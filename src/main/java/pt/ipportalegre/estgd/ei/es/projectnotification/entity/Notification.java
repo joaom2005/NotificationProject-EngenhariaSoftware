@@ -49,6 +49,13 @@ public class Notification {
     /** Earliest moment the next attempt may run. Null means "as soon as possible". */
     private LocalDateTime nextAttemptAt;
 
+    /** Moment the mail server accepted the notification. Null for rows created before bounce tracking. */
+    private LocalDateTime sentAt;
+
+    /** Why the notification bounced. Null unless the status is BOUNCED. */
+    @Column(columnDefinition = "TEXT")
+    private String bounceReason;
+
     // LAZY on purpose: 'recipients' is already an EAGER List, and fetching two
     // eager Lists at once makes Hibernate throw MultipleBagFetchException.
     @OneToMany(mappedBy = "notification", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -92,12 +99,26 @@ public class Notification {
         return attempt;
     }
 
-    public void markSent() {
+    public void markSent(LocalDateTime sentAt) {
         requirePending();
         this.status = NotificationStatus.SENT;
+        this.sentAt = Objects.requireNonNull(sentAt, "sentAt must not be null");
         this.nextAttemptAt = null;
     }
 
+    /** SENT -> BOUNCED. Terminal: the recipient's side rejected the message after we sent it. */
+    public void markBounced(String reason) {
+        requireSent();
+        this.status = NotificationStatus.BOUNCED;
+        this.bounceReason = reason;
+    }
+
+    private void requireSent() {
+        if (status != NotificationStatus.SENT) {
+            throw new IllegalStateException(
+                    "Notification " + id + " is " + status + " and cannot be marked as bounced");
+        }
+    }
     /** PENDING -> FAILED. Terminal: no more attempts will be made. */
     public void markFailed() {
         requirePending();
@@ -147,6 +168,9 @@ public class Notification {
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
     }
+
+    public LocalDateTime getSentAt() { return sentAt; }
+    public String getBounceReason() { return bounceReason; }
 
     public NotificationStatus getStatus() {
         return status;
