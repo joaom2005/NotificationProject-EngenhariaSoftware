@@ -1,65 +1,33 @@
 <!DOCTYPE html>
-<html lang="en"
-      xmlns:th="http://www.thymeleaf.org">
-
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <title>Notification Details</title>
-
     <link rel="stylesheet" th:href="@{/css/style.css}">
 </head>
-
 <body>
 
 <header class="navbar">
-
     <div class="container navbar-content">
-
-        <a class="logo"
-           th:href="@{/notifications}">
-            Notification System
-        </a>
-
+        <a class="logo" th:href="@{/notifications}">Notification System</a>
         <nav>
-            <a th:href="@{/notifications}">
-                Notifications
-            </a>
+            <a th:href="@{/notifications}">Notifications</a>
         </nav>
-
     </div>
-
 </header>
 
-
 <main class="container">
-
     <div class="page-header">
-
         <div>
-
-            <h1 th:text="${notification.subject}">
-                Notification Subject
-            </h1>
-
-            <p class="subtitle">
-                Notification details
-            </p>
-
+            <h1 th:text="${notification.subject}">Notification Subject</h1>
+            <p class="subtitle">Notification details</p>
         </div>
 
-        <a class="button"
-           th:href="@{/notifications}">
-            ← Back
-        </a>
-
+        <a class="button" th:href="@{/notifications}">← Back</a>
     </div>
 
-
     <div class="card notification-details">
-
-
         <div class="detail-row">
             <span class="detail-label">Recipients</span>
             <div>
@@ -70,28 +38,38 @@
             </div>
         </div>
 
-        <div class="detail-row">
+        <div class="detail-row" th:with="state=${notification.status.name()}">
             <span class="detail-label">Status</span>
             <div>
                 <span class="status"
-                      th:classappend="${notification.status.name() == 'SENT'} ? 'status-success' : (${notification.status.name() == 'FAILED'} ? 'status-failed' : 'status-pending')"
+                      th:classappend="${state == 'SENT' ? 'status-success'
+                          : ((state == 'FAILED' or state == 'BOUNCED') ? 'status-failed' : 'status-pending')}"
                       th:text="${notification.status}">
                     PENDING
                 </span>
-                <span class="subtitle"
-                      th:text="' ' + ${notification.attemptCount} + ' attempt(s)'">
+                <span class="subtitle" th:text="|${notification.attemptCount} attempt(s)|">
+                    0 attempt(s)
                 </span>
             </div>
+        </div>
+
+        <div class="detail-row" th:if="${notification.bounceReason != null}">
+            <span class="detail-label">Bounce reason</span>
+            <div th:text="${notification.bounceReason}">Recipient rejected</div>
         </div>
 
         <div class="detail-row">
             <span class="detail-label">Channel</span>
             <div>
-        <span class="status status-channel"
-              th:text="${notification.channel}">
-            EMAIL
-        </span>
+                <span class="status status-channel" th:text="${notification.channel}">
+                    EMAIL
+                </span>
             </div>
+        </div>
+
+        <div class="detail-row">
+            <span class="detail-label">Priority</span>
+            <div th:text="${notification.priority}">NORMAL</div>
         </div>
 
         <div class="detail-row">
@@ -101,7 +79,6 @@
             </div>
         </div>
 
-        <!-- Only meaningful while a retry is scheduled -->
         <div class="detail-row"
              th:if="${notification.status.name() == 'PENDING' and notification.nextAttemptAt != null}">
             <span class="detail-label">Next attempt</span>
@@ -112,24 +89,17 @@
 
         <hr>
 
-        <p>Priority <strong th:text="${notification.priority}">NORMAL</strong></p>
-
-        <hr>
-
         <div class="message">
             <h2>Message</h2>
-            <p th:text="${notification.message}">
-                This is the notification message.
-            </p>
+            <p th:text="${notification.message}">This is the notification message.</p>
         </div>
     </div>
 
-    <!-- Delivery history -->
     <div class="card notification-details">
         <h2>Delivery history</h2>
 
         <p class="subtitle" th:if="${#lists.isEmpty(notification.attempts)}">
-            No delivery attempts yet. The notification is waiting to be processed.
+            No delivery attempts recorded.
         </p>
 
         <div class="table-container" th:if="${!#lists.isEmpty(notification.attempts)}">
@@ -145,7 +115,7 @@
                 <tbody>
                 <tr th:each="attempt : ${notification.attempts}">
                     <td th:text="${attempt.attemptNumber}">1</td>
-                    <td th:text="${attempt.attemptedAt}">2026-11-04 12:00</td>
+                    <td th:text="${attempt.attemptedAt}">2026-11-25 10:01</td>
                     <td>
                         <span class="status"
                               th:classappend="${attempt.success} ? 'status-success' : 'status-failed'"

@@ -9,7 +9,10 @@ import java.util.List;
 import java.util.Objects;
 
 @Entity
-@Table(name = "notifications")
+@Table(name = "notifications", indexes = {
+        @Index(name = "idx_notifications_status_next_attempt",
+                columnList = "status, next_attempt_at")
+})
 public class Notification {
 
     @Id
@@ -38,27 +41,6 @@ public class Notification {
 
     private LocalDateTime claimUntil;
 
-    public boolean tryClaim(String token, LocalDateTime now, LocalDateTime until) {
-        if (status != NotificationStatus.PENDING
-                || (nextAttemptAt != null && nextAttemptAt.isAfter(now))
-                || (claimUntil != null && claimUntil.isAfter(now))) {
-            return false;
-        }
-
-        claimToken = token;
-        claimUntil = until;
-        return true;
-    }
-
-    public boolean hasClaim(String token) {
-        return token.equals(claimToken);
-    }
-
-    public void clearClaim() {
-        claimToken = null;
-        claimUntil = null;
-    }
-
     // Delivery tracking
 
     // The column default only matters for rows created before delivery tracking existed:
@@ -73,6 +55,7 @@ public class Notification {
     private int attemptCount = 0;
 
     /** Earliest moment the next attempt may run. Null means "as soon as possible". */
+    @Column(name = "next_attempt_at")
     private LocalDateTime nextAttemptAt;
 
     /** Moment the mail server accepted the notification. Null for rows created before bounce tracking. */
@@ -169,6 +152,27 @@ public class Notification {
             throw new IllegalStateException(
                     "Notification " + id + " is " + status + " and can no longer change state");
         }
+    }
+
+    public boolean tryClaim(String token, LocalDateTime now, LocalDateTime until) {
+        if (status != NotificationStatus.PENDING
+                || (nextAttemptAt != null && nextAttemptAt.isAfter(now))
+                || (claimUntil != null && claimUntil.isAfter(now))) {
+            return false;
+        }
+
+        claimToken = token;
+        claimUntil = until;
+        return true;
+    }
+
+    public boolean hasClaim(String token) {
+        return token.equals(claimToken);
+    }
+
+    public void clearClaim() {
+        claimToken = null;
+        claimUntil = null;
     }
 
     // Getters and setters

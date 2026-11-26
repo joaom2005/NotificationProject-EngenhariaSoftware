@@ -39,23 +39,24 @@ public class DeliveryProcessor {
     private final NotificationRepository repository;
     private final NotificationSenderRegistry senderRegistry;
     private final TransactionTemplate transactionTemplate;
+    private final NotificationClaimer notificationClaimer;
     private final Clock clock;
     private final RetryPolicy retryPolicy;
 
     private static final Duration CLAIM_DURATION = Duration.ofMinutes(5);
     private static final int MAX_ATTEMPTS_PER_POLL = 10;
 
-    private record ClaimedNotification(Notification notification, String token) {}
-
     public DeliveryProcessor(
             NotificationRepository repository,
             NotificationSenderRegistry senderRegistry,
             TransactionTemplate transactionTemplate,
+            NotificationClaimer notificationClaimer,
             Clock clock,
             RetryPolicy retryPolicy) {
         this.repository = repository;
         this.senderRegistry = senderRegistry;
         this.transactionTemplate = transactionTemplate;
+        this.notificationClaimer = notificationClaimer;
         this.clock = clock;
         this.retryPolicy = retryPolicy;
     }
@@ -66,7 +67,7 @@ public class DeliveryProcessor {
      */
     public void processDueNotifications() {
         for (int i = 0; i < MAX_ATTEMPTS_PER_POLL; i++) {
-            ClaimedNotification claim = claimNext();
+            NotificationClaimer.ClaimedNotification claim = notificationClaimer.claimNext();
             if (claim == null) {
                 return;
             }
@@ -139,44 +140,5 @@ public class DeliveryProcessor {
         repository.save(notification);
     }
 
-    private ClaimedNotification claimNext() {
-        // If another worker claims the same candidate first, read the queue again.
-        for (int attempt = 0; attempt < 3; attempt++) {
-            LocalDateTime now = LocalDateTime.now(clock);
 
-            List<Long> candidates = repository.findClaimCandidates(
-                    NotificationStatus.PENDING,
-                    now,
-                    NotificationPriority.HIGH,
-                    NotificationPriority.NORMAL,
-                    now.minusMinutes(5),
-                    now.minusMinutes(10),
-                    PageRequest.of(0, 1));
-
-            if (candidates.isEmpty()) {
-                return null;
-            }
-
-            Long id = candidates.getFirst();
-            String token = UUID.randomUUID().toString();
-
-            ClaimedNotification claim = transactionTemplate.execute(transaction -> {
-                Notification notification = repository.findLockedById(id).orElse(null);
-                LocalDateTime claimedAt = LocalDateTime.now(clock);
-
-                if (notification == null || !notification.tryClaim(
-                        token, claimedAt, claimedAt.plus(CLAIM_DURATION))) {
-                    return null;
-                }
-
-                return new ClaimedNotification(notification, token);
-            });
-
-            if (claim != null) {
-                return claim;
-            }
-        }
-
-        return null;
-    }
 }
